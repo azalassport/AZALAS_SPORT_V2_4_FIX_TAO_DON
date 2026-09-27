@@ -1,0 +1,4 @@
+import Link from "next/link";
+import {PageTop} from "@/components/ui";
+import {Link2,Palette,Printer,Layers3} from "lucide-react";
+export default function Page(){const list=[{href:"daykeo",name:"Dây kéo",desc:"Nhập vật tư dây kéo",I:Link2},{href:"embroidery",name:"Thêu",desc:"Đối tác, phiếu và công nợ thêu",I:Palette},{href:"printing",name:"Nhật - In / Tùng - In",desc:"Phiếu nhập / công nợ theo đối tác in",I:Printer},{href:"fabric",name:"Vải",desc:"Nhà cung cấp, nhập vải và thanh toán",I:Layers3}];return <><PageTop title="Quản lý phụ liệu" kicker="VẬN HÀNH / PHỤ LIỆU" description="Mỗi nhóm được tách file và trang riêng; phần đối soát nâng cao của app cũ đang được chuyển dần." back="/azalas"/><div className="grid-menu">{list.map(x=><Link key={x.href} className="menu-tile" href={`/azalas/materials/${x.href}`}><div className="tile-icon"><x.I size={20}/></div><div><strong>{x.name}</strong><small>{x.desc}</small></div></Link>)}</div></>}

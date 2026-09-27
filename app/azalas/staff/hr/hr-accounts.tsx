@@ -1,0 +1,10 @@
+"use client";
+import {useMemo,useState} from "react";
+import {createClient} from "@/lib/supabase/client";
+import {Msg} from "@/components/ui";
+import type {HrData,Profile} from "./model";
+export default function HrAccounts({data,onSaved}:{data:HrData;onSaved:()=>Promise<void>}){
+ const sb=useMemo(()=>createClient(),[]),[roles,setRoles]=useState<Record<string,Profile["role"]>>({}),[busy,setBusy]=useState(false),[err,setErr]=useState(""),[ok,setOk]=useState("");
+ async function save(u:Profile,active:boolean){const role=roles[u.id]||u.role;if(!confirm(`Xác nhận ${role} · ${active?"KÍCH HOẠT":"TẠM KHÓA"} tài khoản ${u.display_name}?`))return;setBusy(true);setErr("");const {error:e}=await sb.rpc("az_manage_member",{p_user_id:u.id,p_role:role,p_active:active});setBusy(false);if(e)setErr(e.message);else{setOk("Đã cập nhật vai trò và trạng thái tài khoản.");await onSaved()}}
+ return <section className="panel stack"><div className="eyebrow">TÀI KHOẢN & PHÂN QUYỀN</div><h2>Chỉ ba vai trò OWNER / ADMIN / MEMBER</h2><p className="muted text-sm">Tạo tài khoản qua Supabase Authentication → Users hoặc quy trình mời quản trị. Tài khoản mới chưa kích hoạt; không đưa service-role key vào frontend. OWNER cuối cùng không được tự khóa hoặc hạ quyền.</p><Msg error={err} success={ok}/>{data.profiles.map(u=><div key={u.id} className="grid gap-3 rounded-xl border p-3 sm:grid-cols-[1fr_165px_170px] sm:items-center"><div><b>{u.display_name}</b><p className="muted text-xs">{u.phone||"Chưa có SĐT"} · {u.is_active?"Đang hoạt động":"Chưa kích hoạt / Tạm khóa"}</p></div><select className="field" value={roles[u.id]||u.role} onChange={e=>setRoles(r=>({...r,[u.id]:e.target.value as Profile["role"]}))}><option value="MEMBER">MEMBER</option><option value="ADMIN">ADMIN</option><option value="OWNER">OWNER</option></select><div className="flex flex-wrap gap-1"><button disabled={busy} className="btn primary" onClick={()=>void save(u,u.is_active)}>Lưu quyền</button><button disabled={busy} className="btn soft" onClick={()=>void save(u,!u.is_active)}>{u.is_active?"Khóa":"Kích hoạt"}</button></div></div>)}</section>;
+}
