@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback,useEffect,useMemo,useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { day } from "@/lib/azalas/format";
 type Group={id:number;customer_name:string;order_type:"THUONG"|"KHACH_DAT";is_urgent:boolean;delivery_date:string|null;created_at:string;creator_note:string|null};
 type Unit={id:number;group_id:number;warehouse_id:number|null;order_code:string;status:string;started_by_name:string|null;deferred_by_name:string|null;created_at:string};
 type Warehouse={id:number;name:string;code:string};
@@ -47,7 +48,7 @@ export default function OrdersBoard(){
    <h2 className="rounded-xl bg-blue-100 px-4 py-3 text-xl font-extrabold text-blue-900">{warehouse} · {rows.length} đơn</h2>
    <div className="grid gap-3 md:grid-cols-2">{rows.map(u=>{const g=groupMap.get(u.group_id)!;return <article key={u.id} className="rounded-2xl border bg-white p-4 shadow-sm">
     <div className="flex items-start justify-between gap-2"><b className="break-all text-blue-900">{u.order_code}</b>{g.is_urgent&&<span className="rounded bg-red-100 px-2 py-1 text-xs font-extrabold text-red-700">🔥 GẤP</span>}</div>
-    <p className="mt-2 text-lg font-bold">{g.customer_name}</p><p className="text-sm text-slate-600">Ngày giao: {g.delivery_date?new Date(g.delivery_date+"T12:00:00").toLocaleDateString("vi-VN"):"Chưa chọn"}</p>
+    <p className="mt-2 text-lg font-bold">{g.customer_name}</p><p className="text-sm text-slate-600">Ngày giao: {g.delivery_date?day(g.delivery_date):"Chưa chọn"}</p>
     {u.status==="DANG_SOAN"&&<p className="mt-1 text-sm text-orange-700">Người soạn: {u.started_by_name||"Chưa rõ"}</p>}
     {u.status==="NO_DON"&&<p className="mt-1 text-sm text-orange-700">Người chuyển nợ: {u.deferred_by_name||"Chưa rõ"}</p>}
     <div className="mt-4 flex flex-wrap gap-2"><Link href={`/azalas/orders/${u.id}/pack`} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">{u.status==="DANG_SOAN"?"Soạn tiếp":u.status==="NO_DON"?"Bắt đầu soạn lại":"Xem đơn / Bắt đầu soạn"}</Link>
