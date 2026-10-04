@@ -1,4 +1,28 @@
 import Link from "next/link";
-import {PageTop} from "@/components/ui";
-import {Link2,Palette,Printer,Layers3} from "lucide-react";
-export default function Page(){const list=[{href:"daykeo",name:"Dây kéo",desc:"Nhập vật tư dây kéo",I:Link2},{href:"embroidery",name:"Thêu",desc:"Đối tác, phiếu và công nợ thêu",I:Palette},{href:"printing",name:"Nhật - In / Tùng - In",desc:"Phiếu nhập / công nợ theo đối tác in",I:Printer},{href:"fabric",name:"Vải",desc:"Nhà cung cấp, nhập vải và thanh toán",I:Layers3}];return <><PageTop title="Quản lý phụ liệu" kicker="VẬN HÀNH / PHỤ LIỆU" description="Mỗi nhóm được tách file và trang riêng; phần đối soát nâng cao của app cũ đang được chuyển dần." back="/azalas"/><div className="grid-menu">{list.map(x=><Link key={x.href} className="menu-tile" href={`/azalas/materials/${x.href}`}><div className="tile-icon"><x.I size={20}/></div><div><strong>{x.name}</strong><small>{x.desc}</small></div></Link>)}</div></>}
+
+const cards=[
+  {href:"/azalas/materials/daykeo",title:"Dây kéo",desc:"Nhập hàng · Giá & Danh mục · Công nợ",icon:"🔗"},
+  {href:"/azalas/materials/embroidery",title:"Thêu",desc:"Chốt tháng · Ứng · Thanh toán",icon:"🧵"},
+  {href:"/azalas/materials/printing/nhat",title:"Nhật - In",desc:"Sổ riêng Nhật · PDF đối chiếu · Công nợ",icon:"🖨️"},
+  {href:"/azalas/materials/printing/tung",title:"Tùng - In",desc:"Sổ riêng Tùng · PDF đối chiếu · Công nợ",icon:"🖨️"},
+  {href:"/azalas/materials/fabric",title:"Vải",desc:"Nhập vải · Hàng trả · Thanh toán · Công nợ",icon:"🧶",wide:true},
+];
+
+export default function MaterialsPage(){
+  return <div className="stack">
+    <section className="panel">
+      <div className="muted text-xs font-extrabold uppercase tracking-widest">Kho / Xưởng</div>
+      <h1 className="mt-1 text-2xl font-black text-slate-900">Quản lý phụ liệu</h1>
+      <p className="muted mt-1">Chọn đúng sổ nghiệp vụ. Nhật - In và Tùng - In được tách riêng.</p>
+    </section>
+    <div className="grid gap-4 md:grid-cols-2">
+      {cards.map(c=><Link key={c.href} href={c.href} className={`panel group block transition hover:-translate-y-0.5 hover:shadow-lg ${c.wide?"md:col-span-2":""}`}>
+        <div className="flex items-center gap-4">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-2xl">{c.icon}</div>
+          <div className="min-w-0 flex-1"><div className="text-lg font-black text-slate-900">{c.title}</div><div className="muted text-sm">{c.desc}</div></div>
+          <div className="text-xl text-slate-400 transition group-hover:translate-x-1">→</div>
+        </div>
+      </Link>)}
+    </div>
+  </div>
+}
