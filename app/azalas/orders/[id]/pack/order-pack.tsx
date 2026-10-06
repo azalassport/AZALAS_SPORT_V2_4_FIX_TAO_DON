@@ -573,29 +573,29 @@ export default function OrderPack({ unitId }: { unitId: number }) {
     <div className="mx-auto w-full max-w-[1580px] pb-10">
       <Link
         href="/azalas/orders"
-        className="inline-flex items-center gap-2 text-[16px] font-extrabold text-blue-700 transition hover:text-blue-800"
+        className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-[13px] font-black text-blue-700 shadow-[0_5px_14px_rgba(37,99,235,0.08)] transition hover:bg-blue-50 sm:min-h-[46px] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-[15px]"
       >
-        <ArrowLeft size={19} strokeWidth={2.5} />
+        <ArrowLeft className="h-4 w-4 sm:h-[19px] sm:w-[19px]" strokeWidth={2.5} />
         Quay lại Chi tiết đơn
       </Link>
 
-      <section className="mt-5 overflow-hidden rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_38px_rgba(22,58,110,0.07)] sm:p-6">
-        <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-start">
-          <div className="flex min-w-0 items-start gap-5">
+      <section className="mt-3 overflow-hidden rounded-[20px] border border-slate-200 bg-white p-3 shadow-[0_10px_28px_rgba(22,58,110,0.06)] sm:mt-5 sm:rounded-[26px] sm:p-6 sm:shadow-[0_14px_38px_rgba(22,58,110,0.07)]">
+        <div className="flex flex-col justify-between gap-3 sm:gap-5 lg:flex-row lg:items-start">
+          <div className="flex min-w-0 items-start gap-3 sm:gap-5">
             <div
-              className="grid h-[84px] w-[84px] shrink-0 place-items-center rounded-2xl"
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl sm:h-[84px] sm:w-[84px] sm:rounded-2xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
-              <ClipboardList size={46} strokeWidth={2.15} />
+              <ClipboardList className="h-8 w-8 sm:h-[46px] sm:w-[46px]" strokeWidth={2.15} />
             </div>
 
             <div className="min-w-0">
-              <h1 className="break-all text-[33px] font-black leading-tight tracking-[-0.8px] text-[#10264c] sm:text-[42px]">
+              <h1 className="break-all text-[24px] font-black leading-tight tracking-[-0.4px] text-[#10264c] sm:text-[42px] sm:tracking-[-0.8px]">
                 {unit.order_code}
               </h1>
 
               {group.is_urgent && (
-                <span className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-red-50 px-5 py-2.5 text-[17px] font-black text-red-600">
+                <span className="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-red-50 px-3 py-2 text-[14px] font-black text-red-600 sm:mt-3 sm:gap-2 sm:rounded-2xl sm:px-5 sm:py-2.5 sm:text-[17px]">
                   <Flame
                     size={19}
                     className="text-orange-500"
@@ -608,24 +608,24 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           </div>
 
           <div
-            className="flex min-w-[300px] items-center gap-4 rounded-2xl px-5 py-4"
+            className="flex w-full min-w-0 items-center gap-3 rounded-xl px-3 py-3 sm:min-w-[300px] sm:gap-4 sm:rounded-2xl sm:px-5 sm:py-4 lg:w-auto"
             style={{ background: palette.panel, color: palette.accentDark }}
           >
             <span
-              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg sm:h-14 sm:w-14 sm:rounded-xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
-              <Home size={31} strokeWidth={2.4} />
+              <Home className="h-6 w-6 sm:h-[31px] sm:w-[31px]" strokeWidth={2.4} />
             </span>
 
             <div>
-              <div className="text-[20px] font-black">
+              <div className="text-[16px] font-black sm:text-[20px]">
                 Kho:{" "}
                 {warehouse
                   ? `${warehouse.name} (${warehouse.code})`
                   : "Khách đặt"}
               </div>
-              <div className="mt-1 text-[14px] font-medium text-slate-500">
+              <div className="mt-0.5 text-[12px] font-medium text-slate-500 sm:mt-1 sm:text-[14px]">
                 {warehouse
                   ? `Đơn thuộc kho ${warehouse.name}`
                   : "Đơn khách đặt chưa gắn kho"}
@@ -634,74 +634,74 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           </div>
         </div>
 
-        <div className="mt-7 grid overflow-hidden rounded-2xl bg-[#f6f9fe] lg:grid-cols-4">
-          <div className="flex items-center gap-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-              <UserRound size={30} strokeWidth={2.3} />
+        <div className="mt-4 grid overflow-hidden rounded-xl bg-[#f6f9fe] sm:mt-7 sm:rounded-2xl lg:grid-cols-4">
+          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-14 sm:w-14 sm:rounded-xl">
+              <UserRound className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[15px] font-medium text-slate-600">
+              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">
                 Khách hàng
               </p>
-              <strong className="mt-1 block text-[21px] font-black text-[#10264c]">
+              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {group.customer_name}
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-600">
-              <ListChecks size={30} strokeWidth={2.3} />
+          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 sm:h-14 sm:w-14 sm:rounded-xl">
+              <ListChecks className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[15px] font-medium text-slate-600">
+              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">
                 Trạng thái
               </p>
-              <span className="mt-1 inline-flex rounded-xl bg-blue-100 px-4 py-2 text-[17px] font-black text-blue-700">
+              <span className="mt-0.5 inline-flex rounded-lg bg-blue-100 px-3 py-1.5 text-[14px] font-black text-blue-700 sm:mt-1 sm:rounded-xl sm:px-4 sm:py-2 sm:text-[17px]">
                 {statusLabel(unit.status)}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 border-b border-slate-200 p-5 lg:border-b-0 lg:border-r">
+          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
             <span
-              className="grid h-14 w-14 shrink-0 place-items-center rounded-xl"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg sm:h-14 sm:w-14 sm:rounded-xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
-              <CalendarDays size={30} strokeWidth={2.3} />
+              <CalendarDays className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[15px] font-medium text-slate-600">Ngày giao</p>
-              <strong className="mt-1 block text-[21px] font-black text-[#10264c]">
+              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">Ngày giao</p>
+              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {formatDate(group.delivery_date)}
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-4 p-5">
-            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-500">
-              <UserRound size={30} strokeWidth={2.3} />
+          <div className="flex items-center gap-3 p-3 sm:gap-4 sm:p-5">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-500 sm:h-14 sm:w-14 sm:rounded-xl">
+              <UserRound className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
               <p className="text-[15px] font-medium text-slate-600">
                 Người soạn
               </p>
-              <strong className="mt-1 block text-[21px] font-black text-[#10264c]">
+              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {unit.started_by_name || "—"}
               </strong>
             </div>
           </div>
         </div>
 
-        <div className="mt-5 flex gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-          <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-500">
-            <MessageSquareText size={30} strokeWidth={2.2} />
+        <div className="mt-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 sm:mt-5 sm:gap-4 sm:rounded-2xl sm:p-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-500 sm:h-14 sm:w-14 sm:rounded-xl">
+            <MessageSquareText className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.2} />
           </span>
           <div>
-            <p className="text-[16px] font-black text-[#10264c]">
+            <p className="text-[14px] font-black text-[#10264c] sm:text-[16px]">
               Ghi chú tạo đơn
             </p>
-            <p className="mt-1 whitespace-pre-wrap text-[16px] font-medium text-slate-700">
+            <p className="mt-1 whitespace-pre-wrap text-[14px] font-medium text-slate-700 sm:text-[16px]">
               {group.creator_note || "—"}
             </p>
           </div>
@@ -873,7 +873,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
         )}
 
         {ok && (
-          <p className="mt-5 rounded-2xl border border-green-100 bg-green-50 p-4 text-[15px] font-bold text-green-800">
+          <p className="mt-4 rounded-xl border border-green-100 bg-green-50 p-3 text-[13px] font-bold text-green-800 sm:mt-5 sm:rounded-2xl sm:p-4 sm:text-[15px]">
             {ok}
           </p>
         )}
@@ -929,13 +929,13 @@ export default function OrderPack({ unitId }: { unitId: number }) {
         )}
 
         {packingMode && (
-          <div className="mt-7 border-t border-slate-200 pt-6">
+          <div className="mt-5 border-t border-slate-200 pt-4 sm:mt-7 sm:pt-6">
             <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
               <div>
-                <h2 className="text-[24px] font-black text-[#10264c]">
+                <h2 className="text-[20px] font-black text-[#10264c] sm:text-[24px]">
                   Soạn hàng
                 </h2>
-                <p className="mt-1 text-[15px] font-medium text-slate-500">
+                <p className="mt-1 text-[13px] font-medium text-slate-500 sm:text-[15px]">
                   Nhập sản phẩm, số lượng và giá thực tế.
                 </p>
               </div>
@@ -943,15 +943,15 @@ export default function OrderPack({ unitId }: { unitId: number }) {
               <button
                 type="button"
                 onClick={() => setLines((old) => [...old, blankLine()])}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-50 px-4 py-3 text-[15px] font-black text-blue-700"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-3 py-2.5 text-[13px] font-black text-blue-700 sm:gap-2 sm:rounded-xl sm:px-4 sm:py-3 sm:text-[15px]"
               >
                 <Plus size={19} />
                 Thêm dòng sản phẩm
               </button>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-slate-200">
-              <table className="min-w-[980px] w-full border-collapse bg-white">
+            <div className="packing-lines-table rounded-xl border border-slate-200 sm:rounded-2xl">
+              <table className="w-full min-w-0 border-collapse bg-white md:min-w-[980px]">
                 <thead className="bg-slate-50 text-left text-[14px] font-black text-[#29456b]">
                   <tr>
                     <th className="w-[70px] px-4 py-4 text-center">STT</th>
@@ -974,13 +974,13 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                     return (
                       <tr
                         key={line.key}
-                        className="border-t border-slate-200 align-top"
+                        className="packing-line-row border-t border-slate-200 align-top"
                       >
-                        <td className="px-4 py-4 text-center text-[15px] font-black text-slate-600">
+                        <td className="packing-index px-4 py-4 text-center text-[15px] font-black text-slate-600">
                           {index + 1}
                         </td>
 
-                        <td className="relative px-4 py-3">
+                        <td className="packing-product relative px-4 py-3">
                           <div className="relative">
                             <Search
                               size={18}
@@ -997,7 +997,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                                 );
                                 void searchProduct(line.key, value);
                               }}
-                              className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-[16px] font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                              className="w-full rounded-lg border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-[14px] font-semibold outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 sm:rounded-xl sm:py-3 sm:pl-10 sm:text-[16px]"
                               placeholder="Tên hoặc mã sản phẩm"
                             />
                           </div>
@@ -1017,7 +1017,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                           )}
 
                           {(searchResults[line.key] || []).length > 0 && (
-                            <div className="absolute left-4 right-4 top-[62px] z-30 max-h-[260px] overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                            <div className="packing-search-results absolute left-4 right-4 top-[58px] z-30 max-h-[260px] overflow-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl sm:top-[62px]">
                               {(searchResults[line.key] || []).map(
                                 (product) => (
                                   <button
@@ -1048,7 +1048,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                           )}
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="packing-qty px-4 py-3">
                           <input
                             inputMode="numeric"
                             value={line.quantity}
@@ -1057,11 +1057,11 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                                 quantity: event.target.value.replace(/\D/g, ""),
                               })
                             }
-                            className="w-full rounded-xl border border-slate-300 px-3 py-3 text-[16px] font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-lg border border-slate-300 px-2.5 py-2.5 text-[14px] font-bold outline-none focus:border-blue-500 sm:rounded-xl sm:px-3 sm:py-3 sm:text-[16px]"
                           />
                         </td>
 
-                        <td className="px-4 py-3">
+                        <td className="packing-price px-4 py-3">
                           <input
                             inputMode="decimal"
                             value={line.unit_price}
@@ -1073,15 +1073,15 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                                 ),
                               })
                             }
-                            className="w-full rounded-xl border border-slate-300 px-3 py-3 text-[16px] font-bold outline-none focus:border-blue-500"
+                            className="w-full rounded-lg border border-slate-300 px-2.5 py-2.5 text-[14px] font-bold outline-none focus:border-blue-500 sm:rounded-xl sm:px-3 sm:py-3 sm:text-[16px]"
                           />
                         </td>
 
-                        <td className="px-4 py-4 text-right text-[16px] font-black text-[#10264c]">
+                        <td className="packing-amount px-4 py-4 text-right text-[16px] font-black text-[#10264c]">
                           {money(amount)} đ
                         </td>
 
-                        <td className="px-4 py-3 text-center">
+                        <td className="packing-delete px-4 py-3 text-center">
                           <button
                             type="button"
                             onClick={() =>
@@ -1092,7 +1092,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                                 return next.length ? next : [blankLine()];
                               })
                             }
-                            className="grid h-11 w-11 place-items-center rounded-xl bg-red-50 text-red-500 hover:bg-red-100"
+                            className="grid h-9 w-9 place-items-center rounded-lg bg-red-50 text-red-500 hover:bg-red-100 sm:h-11 sm:w-11 sm:rounded-xl"
                             aria-label={`Xóa dòng ${index + 1}`}
                           >
                             <Trash2 size={19} />
@@ -1107,11 +1107,11 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-4 py-4 text-right text-[16px] font-black text-[#10264c]"
+                      className="packing-total-label px-4 py-4 text-right text-[16px] font-black text-[#10264c]"
                     >
                       TỔNG CỘNG
                     </td>
-                    <td className="px-4 py-4 text-right text-[18px] font-black text-red-600">
+                    <td className="packing-total-value px-4 py-4 text-right text-[18px] font-black text-red-600">
                       {money(total)} đ
                     </td>
                     <td />
@@ -1120,13 +1120,166 @@ export default function OrderPack({ unitId }: { unitId: number }) {
               </table>
             </div>
 
-            <label className="mt-5 block text-[17px] font-black text-[#10264c]">
+          <style>{`
+            @media (max-width: 767px) {
+              .packing-lines-table {
+                overflow: visible;
+                border: 0;
+                background: transparent;
+              }
+
+              .packing-lines-table table,
+              .packing-lines-table tbody,
+              .packing-lines-table tr,
+              .packing-lines-table td {
+                display: block;
+                width: 100%;
+                min-width: 0 !important;
+              }
+
+              .packing-lines-table thead {
+                display: none;
+              }
+
+              .packing-lines-table tbody {
+                display: grid;
+                gap: 10px;
+              }
+
+              .packing-lines-table .packing-line-row {
+                position: relative;
+                overflow: visible;
+                border: 1px solid #e2e8f0;
+                border-radius: 14px;
+                background: #ffffff;
+                padding: 38px 10px 10px;
+                box-shadow: 0 5px 14px rgba(15, 23, 42, 0.04);
+              }
+
+              .packing-lines-table .packing-line-row > td {
+                border: 0;
+                padding: 0 !important;
+              }
+
+              .packing-lines-table .packing-index {
+                position: absolute;
+                left: 12px;
+                top: 10px;
+                width: auto !important;
+                color: #64748b;
+                font-size: 12px;
+                text-align: left;
+              }
+
+              .packing-lines-table .packing-index::before {
+                content: "Dòng ";
+              }
+
+              .packing-lines-table .packing-delete {
+                position: absolute;
+                right: 10px;
+                top: 7px;
+                width: auto !important;
+              }
+
+              .packing-lines-table .packing-product {
+                position: relative;
+                z-index: 5;
+                margin-bottom: 10px;
+              }
+
+              .packing-lines-table .packing-search-results {
+                left: 0 !important;
+                right: 0 !important;
+                top: 52px !important;
+              }
+
+              .packing-lines-table .packing-qty,
+              .packing-lines-table .packing-price {
+                display: inline-block !important;
+                width: calc(50% - 5px) !important;
+                vertical-align: top;
+              }
+
+              .packing-lines-table .packing-qty {
+                margin-right: 6px;
+              }
+
+              .packing-lines-table .packing-qty::before,
+              .packing-lines-table .packing-price::before {
+                display: block;
+                margin-bottom: 4px;
+                color: #64748b;
+                font-size: 11px;
+                font-weight: 800;
+              }
+
+              .packing-lines-table .packing-qty::before {
+                content: "SL";
+              }
+
+              .packing-lines-table .packing-price::before {
+                content: "Giá";
+              }
+
+              .packing-lines-table .packing-amount {
+                display: flex !important;
+                align-items: center;
+                justify-content: space-between;
+                margin-top: 10px;
+                padding-top: 9px !important;
+                border-top: 1px dashed #e2e8f0;
+                font-size: 14px;
+              }
+
+              .packing-lines-table .packing-amount::before {
+                content: "Thành tiền";
+                color: #64748b;
+                font-size: 12px;
+                font-weight: 800;
+              }
+
+              .packing-lines-table tfoot {
+                display: block;
+                margin-top: 10px;
+                border: 1px solid #e2e8f0;
+                border-radius: 14px;
+                background: #f8fafc;
+                overflow: hidden;
+              }
+
+              .packing-lines-table tfoot tr {
+                display: flex !important;
+                align-items: center;
+                justify-content: space-between;
+                width: 100%;
+              }
+
+              .packing-lines-table tfoot td {
+                display: none !important;
+              }
+
+              .packing-lines-table tfoot .packing-total-label,
+              .packing-lines-table tfoot .packing-total-value {
+                display: block !important;
+                width: auto !important;
+                padding: 12px !important;
+                font-size: 14px;
+              }
+
+              .packing-lines-table tfoot .packing-total-value {
+                font-size: 16px;
+              }
+            }
+          `}</style>
+
+            <label className="mt-4 block text-[15px] font-black text-[#10264c] sm:mt-5 sm:text-[17px]">
               Ghi chú soạn hàng
               <textarea
                 rows={3}
                 value={packingNote}
                 onChange={(event) => setPackingNote(event.target.value)}
-                className="mt-2 w-full rounded-2xl border border-slate-300 p-4 text-[16px] font-medium outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                className="mt-2 w-full rounded-xl border border-slate-300 p-3 text-[14px] font-medium outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 sm:rounded-2xl sm:p-4 sm:text-[16px]"
               />
             </label>
 
@@ -1135,7 +1288,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                 type="button"
                 disabled={busy}
                 onClick={() => void savePacking(false)}
-                className="min-h-[54px] rounded-2xl border-2 border-blue-300 bg-white px-5 text-[17px] font-black text-blue-700 hover:bg-blue-50 disabled:opacity-50"
+                className="min-h-[48px] rounded-xl border-2 border-blue-300 bg-white px-4 text-[15px] font-black text-blue-700 hover:bg-blue-50 disabled:opacity-50 sm:min-h-[54px] sm:rounded-2xl sm:px-5 sm:text-[17px]"
               >
                 {busy ? "Đang lưu..." : "LƯU NHÁP"}
               </button>
@@ -1144,7 +1297,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                 type="button"
                 disabled={busy}
                 onClick={() => void savePacking(true)}
-                className="min-h-[54px] rounded-2xl bg-gradient-to-r from-blue-700 to-blue-500 px-5 text-[17px] font-black text-white shadow-[0_10px_22px_rgba(37,99,235,0.18)] hover:brightness-105 disabled:opacity-50"
+                className="min-h-[48px] rounded-xl bg-gradient-to-r from-blue-700 to-blue-500 px-4 text-[15px] font-black text-white shadow-[0_8px_18px_rgba(37,99,235,0.16)] hover:brightness-105 disabled:opacity-50 sm:min-h-[54px] sm:rounded-2xl sm:px-5 sm:text-[17px]"
               >
                 {busy ? "Đang xử lý..." : "XÁC NHẬN & SOẠN XONG"}
               </button>

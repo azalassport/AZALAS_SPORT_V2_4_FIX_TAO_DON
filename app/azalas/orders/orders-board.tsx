@@ -89,6 +89,22 @@ function normalizeText(value: string) {
     .toLowerCase();
 }
 
+function warehousePriority(name: string, code?: string) {
+  const key = `${name} ${code || ""}`.toLowerCase();
+
+  if (code === "TX" || key.includes("tân xuân") || key.includes("tan xuan")) {
+    return 0;
+  }
+
+  if (code === "CK" || key.includes("cá koi") || key.includes("ca koi")) {
+    return 1;
+  }
+
+  if (name === "Khách đặt") return 2;
+
+  return 10;
+}
+
 function paletteForWarehouse(name: string, code?: string) {
   const key = `${name} ${code || ""}`.toLowerCase();
 
@@ -148,6 +164,7 @@ export default function OrdersBoard() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState(0);
+  const [actionOpenId, setActionOpenId] = useState(0);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -335,29 +352,34 @@ export default function OrdersBoard() {
     else await reload();
 
     setBusyId(0);
+    setActionOpenId(0);
   }
 
   return (
     <div className="mx-auto w-full max-w-[1580px] pb-10">
-      <div className="mb-5">
+      <div className="mb-6">
         <Link
           href="/azalas"
-          className="inline-flex items-center gap-2 text-[16px] font-extrabold text-blue-700 transition hover:text-blue-800"
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-[13px] font-black text-blue-700 shadow-[0_5px_14px_rgba(37,99,235,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 sm:min-h-[46px] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-[15px]"
         >
-          <ArrowLeft size={19} strokeWidth={2.5} />
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-blue-50 text-blue-700 sm:h-8 sm:w-8 sm:rounded-lg">
+            <ArrowLeft className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.7} />
+          </span>
           Quay lại
         </Link>
 
-        <h1 className="mt-5 text-[38px] font-black leading-none tracking-[-0.8px] text-[#102b55]">
-          Chi tiết đơn
-        </h1>
+        <div className="mt-3 text-center sm:mt-4">
+          <h1 className="text-[25px] font-black uppercase leading-none tracking-[-0.5px] text-[#102b55] sm:text-[40px] sm:tracking-[-0.7px]">
+            Chi tiết đơn
+          </h1>
 
-        <p className="mt-3 text-[16px] font-medium text-slate-500">
-          Đơn Mới · Đang Soạn · Đơn Nợ · Khách Đặt
-        </p>
+          <p className="mt-2 text-[12px] font-bold text-slate-500 sm:mt-3 sm:text-[16px]">
+            Đơn Mới · Đang Soạn · Đơn Nợ · Khách Đặt
+          </p>
+        </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 lg:grid-cols-4">
         {TABS.map((item) => {
           const selected = tab === item.code;
 
@@ -366,7 +388,7 @@ export default function OrdersBoard() {
               key={item.code}
               type="button"
               onClick={() => setTab(item.code)}
-              className="flex min-h-[78px] items-center gap-4 rounded-2xl border px-4 text-left shadow-[0_7px_22px_rgba(29,65,119,0.04)] transition hover:-translate-y-0.5"
+              className="grid min-h-[56px] grid-cols-[32px_1fr_28px] items-center gap-1.5 rounded-xl border px-2.5 text-center shadow-[0_5px_16px_rgba(29,65,119,0.04)] transition hover:-translate-y-0.5 sm:min-h-[78px] sm:grid-cols-[48px_1fr_40px] sm:gap-3 sm:rounded-2xl sm:px-4 sm:shadow-[0_7px_22px_rgba(29,65,119,0.04)]"
               style={{
                 borderColor: selected ? item.accent : item.border,
                 background: selected ? "#ffffff" : item.soft,
@@ -376,21 +398,21 @@ export default function OrdersBoard() {
               }}
             >
               <span
-                className="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-12 sm:w-12 sm:rounded-xl"
                 style={{ background: item.soft, color: item.accent }}
               >
-                <ClipboardList size={26} strokeWidth={2.2} />
+                <ClipboardList className="h-5 w-5 sm:h-[26px] sm:w-[26px]" strokeWidth={2.2} />
               </span>
 
               <span
-                className="min-w-0 flex-1 text-[17px] font-black"
+                className="min-w-0 text-center text-[12px] font-black leading-tight sm:text-[17px]"
                 style={{ color: selected ? item.accent : "#102b55" }}
               >
                 {item.label}
               </span>
 
               <span
-                className="grid min-w-[38px] place-items-center rounded-xl px-2 py-2 text-[16px] font-black"
+                className="grid min-w-[26px] place-items-center rounded-lg px-1 py-1 text-[12px] font-black sm:min-w-[38px] sm:rounded-xl sm:px-2 sm:py-2 sm:text-[16px]"
                 style={{
                   background: selected ? item.soft : `${item.accent}12`,
                   color: item.accent,
@@ -403,13 +425,13 @@ export default function OrdersBoard() {
         })}
       </div>
 
-      <div className="relative mt-5">
+      <div className="relative mt-3 sm:mt-5">
         <Search
-          size={24}
-          className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"
+          size={20}
+          className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 sm:left-5 sm:h-6 sm:w-6"
         />
         <input
-          className="h-[58px] w-full rounded-2xl border border-slate-300 bg-white pl-14 pr-5 text-[17px] font-medium text-slate-900 shadow-[0_6px_18px_rgba(26,62,115,0.04)] outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          className="h-[48px] w-full rounded-xl border border-slate-300 bg-white pl-11 pr-4 text-[14px] font-medium text-slate-900 shadow-[0_5px_14px_rgba(26,62,115,0.04)] outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 sm:h-[58px] sm:rounded-2xl sm:pl-14 sm:pr-5 sm:text-[17px]"
           placeholder="Tìm tên khách / mã đơn / kho"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
@@ -435,8 +457,19 @@ export default function OrdersBoard() {
       )}
 
       <div className="mt-5 space-y-6">
-        {Array.from(warehouseGroups.entries()).map(
-          ([warehouseName, entry]) => {
+        {Array.from(warehouseGroups.entries())
+          .sort(([, a], [, b]) => {
+            const aRank = warehousePriority(a.warehouse?.name || "Khách đặt", a.warehouse?.code);
+            const bRank = warehousePriority(b.warehouse?.name || "Khách đặt", b.warehouse?.code);
+
+            if (aRank !== bRank) return aRank - bRank;
+
+            return (a.warehouse?.name || "Khách đặt").localeCompare(
+              b.warehouse?.name || "Khách đặt",
+              "vi",
+            );
+          })
+          .map(([warehouseName, entry]) => {
             const palette = paletteForWarehouse(
               warehouseName,
               entry.warehouse?.code,
@@ -561,43 +594,77 @@ export default function OrdersBoard() {
                           </p>
                         )}
 
-                        <div className="mt-auto flex flex-wrap gap-2 border-t border-slate-200 pt-4">
-                          <Link
-                            href={`/azalas/orders/${unit.id}/pack`}
-                            className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-extrabold text-white shadow-sm transition hover:brightness-105"
-                            style={{
-                              background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentDark})`,
-                            }}
-                          >
-                            <Eye size={18} strokeWidth={2.4} />
-                            {unit.status === "DANG_SOAN"
-                              ? "Soạn tiếp"
-                              : unit.status === "NO_DON"
-                                ? "Bắt đầu soạn lại"
-                                : "Xem đơn / Bắt đầu soạn"}
-                          </Link>
-
-                          {unit.status !== "NO_DON" && (
-                            <button
-                              type="button"
-                              disabled={busyId === unit.id}
-                              onClick={() => void act(unit.id, "defer")}
-                              className="min-h-[44px] rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-[14px] font-bold text-[#17345f] transition hover:bg-slate-50 disabled:opacity-50"
+                        <div className="mt-auto border-t border-slate-200 pt-4">
+                          <div className="flex items-center gap-2">
+                            <Link
+                              href={`/azalas/orders/${unit.id}/pack`}
+                              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-extrabold text-white shadow-sm transition hover:brightness-105"
+                              style={{
+                                background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentDark})`,
+                              }}
                             >
-                              Nợ đơn
-                            </button>
-                          )}
+                              <Eye size={18} strokeWidth={2.4} />
+                              Xem đơn
+                            </Link>
 
-                          {(role === "OWNER" || role === "ADMIN") && (
-                            <button
-                              type="button"
-                              disabled={busyId === unit.id}
-                              onClick={() => void act(unit.id, "delete")}
-                              className="inline-flex min-h-[44px] items-center justify-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-[14px] font-bold text-red-600 transition hover:bg-red-50 disabled:opacity-50"
-                            >
-                              <Trash2 size={17} />
-                              Xóa mềm
-                            </button>
+                            {(unit.status !== "NO_DON" ||
+                              role === "OWNER" ||
+                              role === "ADMIN") && (
+                              <button
+                                type="button"
+                                title="Mở thao tác đơn"
+                                aria-label="Mở thao tác đơn"
+                                disabled={busyId === unit.id}
+                                onClick={() =>
+                                  setActionOpenId((current) =>
+                                    current === unit.id ? 0 : unit.id,
+                                  )
+                                }
+                                className={
+                                  "grid h-[44px] w-[44px] shrink-0 place-items-center rounded-xl border transition disabled:opacity-50 " +
+                                  (actionOpenId === unit.id
+                                    ? "border-red-300 bg-red-50 text-red-600"
+                                    : "border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600")
+                                }
+                              >
+                                <Trash2 size={19} strokeWidth={2.2} />
+                              </button>
+                            )}
+                          </div>
+
+                          {actionOpenId === unit.id && (
+                            <div className="mt-2 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 sm:grid-cols-2">
+                              {unit.status !== "NO_DON" ? (
+                                <button
+                                  type="button"
+                                  disabled={busyId === unit.id}
+                                  onClick={() => void act(unit.id, "defer")}
+                                  className="min-h-[42px] rounded-lg border border-amber-200 bg-white px-3 py-2 text-[14px] font-black text-amber-700 transition hover:bg-amber-50 disabled:opacity-50"
+                                >
+                                  Nợ đơn
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  disabled
+                                  className="min-h-[42px] rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-[14px] font-black text-slate-400"
+                                >
+                                  Đã nợ đơn
+                                </button>
+                              )}
+
+                              {(role === "OWNER" || role === "ADMIN") && (
+                                <button
+                                  type="button"
+                                  disabled={busyId === unit.id}
+                                  onClick={() => void act(unit.id, "delete")}
+                                  className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-[14px] font-black text-red-600 transition hover:bg-red-50 disabled:opacity-50"
+                                >
+                                  <Trash2 size={16} />
+                                  Xóa mềm
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </article>
@@ -606,8 +673,7 @@ export default function OrdersBoard() {
                 </div>
               </section>
             );
-          },
-        )}
+          })}
       </div>
 
       <p className="mt-5 text-[12px] text-slate-400">
