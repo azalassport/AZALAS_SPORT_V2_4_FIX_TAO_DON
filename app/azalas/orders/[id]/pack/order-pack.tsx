@@ -14,7 +14,6 @@ import {
   Home,
   Image as ImageIcon,
   Images,
-  Info,
   ListChecks,
   MessageSquareText,
   Plus,
@@ -612,7 +611,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
             style={{ background: palette.panel, color: palette.accentDark }}
           >
             <span
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-lg sm:h-14 sm:w-14 sm:rounded-xl"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-14 sm:w-14 sm:rounded-xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
               <Home className="h-6 w-6 sm:h-[31px] sm:w-[31px]" strokeWidth={2.4} />
@@ -634,66 +633,66 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           </div>
         </div>
 
-        <div className="mt-4 grid overflow-hidden rounded-xl bg-[#f6f9fe] sm:mt-7 sm:rounded-2xl lg:grid-cols-4">
-          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-14 sm:w-14 sm:rounded-xl">
-              <UserRound className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
+        <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-xl bg-[#f6f9fe] sm:mt-7 sm:rounded-2xl lg:grid-cols-4">
+          <div className="flex min-w-0 items-center gap-2 border-b border-slate-200 p-2.5 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-emerald-50 text-emerald-600 sm:h-14 sm:w-14 sm:rounded-xl">
+              <UserRound className="h-5 w-5 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">
+              <p className="truncate text-[11px] font-medium text-slate-600 sm:text-[15px]">
                 Khách hàng
               </p>
-              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
+              <strong className="mt-0.5 block truncate text-[14px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {group.customer_name}
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 sm:h-14 sm:w-14 sm:rounded-xl">
-              <ListChecks className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
+          <div className="flex min-w-0 items-center gap-2 border-b border-slate-200 p-2.5 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600 sm:h-14 sm:w-14 sm:rounded-xl">
+              <ListChecks className="h-5 w-5 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">
+              <p className="truncate text-[11px] font-medium text-slate-600 sm:text-[15px]">
                 Trạng thái
               </p>
-              <span className="mt-0.5 inline-flex rounded-lg bg-blue-100 px-3 py-1.5 text-[14px] font-black text-blue-700 sm:mt-1 sm:rounded-xl sm:px-4 sm:py-2 sm:text-[17px]">
+              <span className="mt-0.5 inline-flex rounded-md bg-blue-100 px-2 py-1 text-[12px] font-black text-blue-700 sm:mt-1 sm:rounded-xl sm:px-4 sm:py-2 sm:text-[17px]">
                 {statusLabel(unit.status)}
               </span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 border-b border-slate-200 p-3 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
+          <div className="flex min-w-0 items-center gap-2 border-b border-slate-200 p-2.5 sm:gap-4 sm:p-5 lg:border-b-0 lg:border-r">
             <span
               className="grid h-10 w-10 shrink-0 place-items-center rounded-lg sm:h-14 sm:w-14 sm:rounded-xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
-              <CalendarDays className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
+              <CalendarDays className="h-5 w-5 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
-              <p className="text-[13px] font-medium text-slate-600 sm:text-[15px]">Ngày giao</p>
-              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
+              <p className="truncate text-[11px] font-medium text-slate-600 sm:text-[15px]">Ngày giao</p>
+              <strong className="mt-0.5 block truncate text-[14px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {formatDate(group.delivery_date)}
               </strong>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 p-3 sm:gap-4 sm:p-5">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-500 sm:h-14 sm:w-14 sm:rounded-xl">
-              <UserRound className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
+          <div className="flex min-w-0 items-center gap-2 p-2.5 sm:gap-4 sm:p-5">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-amber-50 text-amber-500 sm:h-14 sm:w-14 sm:rounded-xl">
+              <UserRound className="h-5 w-5 sm:h-[30px] sm:w-[30px]" strokeWidth={2.3} />
             </span>
             <div>
               <p className="text-[15px] font-medium text-slate-600">
                 Người soạn
               </p>
-              <strong className="mt-0.5 block text-[17px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
+              <strong className="mt-0.5 block truncate text-[14px] font-black text-[#10264c] sm:mt-1 sm:text-[21px]">
                 {unit.started_by_name || "—"}
               </strong>
             </div>
           </div>
         </div>
 
-        <div className="mt-4 flex gap-3 rounded-xl border border-amber-200 bg-amber-50/60 p-3 sm:mt-5 sm:gap-4 sm:rounded-2xl sm:p-4">
+        <div className="mt-3 flex gap-2.5 rounded-xl border border-amber-200 bg-amber-50/60 p-2.5 sm:mt-5 sm:gap-4 sm:rounded-2xl sm:p-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-amber-100 text-amber-500 sm:h-14 sm:w-14 sm:rounded-xl">
             <MessageSquareText className="h-6 w-6 sm:h-[30px] sm:w-[30px]" strokeWidth={2.2} />
           </span>
@@ -707,15 +706,15 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           </div>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-[#f6f9fe] p-4">
-          <div className="mb-4 flex items-center gap-3">
+        <div className="mt-3 rounded-xl bg-[#f6f9fe] p-2.5 sm:mt-5 sm:rounded-2xl sm:p-4">
+          <div className="mb-2.5 flex items-center gap-2 sm:mb-4 sm:gap-3">
             <span
-              className="grid h-11 w-11 place-items-center rounded-xl"
+              className="grid h-8 w-8 place-items-center rounded-lg sm:h-11 sm:w-11 sm:rounded-xl"
               style={{ background: palette.soft, color: palette.accent }}
             >
-              <Images size={25} strokeWidth={2.3} />
+              <Images className="h-5 w-5 sm:h-[25px] sm:w-[25px]" strokeWidth={2.3} />
             </span>
-            <h2 className="text-[21px] font-black text-[#10264c]">
+            <h2 className="text-[16px] font-black text-[#10264c] sm:text-[21px]">
               Ảnh tạo đơn (nhấn ảnh để xem lớn)
             </h2>
           </div>
@@ -723,7 +722,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1fr) 360px",
+              gridTemplateColumns: "1fr",
               gap: 14,
               alignItems: "stretch",
             }}
@@ -776,7 +775,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                     minHeight: 170,
                     flex: "1 1 240px",
                   }}
-                  className="grid place-items-center rounded-2xl border border-dashed border-slate-300 text-[15px] font-semibold text-slate-400"
+                  className="order-pack-empty-image grid place-items-center rounded-xl border border-dashed border-slate-300 text-[13px] font-semibold text-slate-400 sm:rounded-2xl sm:text-[15px]"
                 >
                   Chưa có ảnh tạo đơn
                 </div>
@@ -797,20 +796,20 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                     minHeight: 170,
                     flex: "1 1 290px",
                   }}
-                  className="grid place-items-center rounded-2xl border-2 border-dashed border-blue-300 bg-white px-5 text-center transition hover:bg-blue-50 disabled:opacity-50"
+                  className="order-pack-upload grid place-items-center rounded-xl border-2 border-dashed border-blue-300 bg-white px-4 text-center transition hover:bg-blue-50 disabled:opacity-50 sm:rounded-2xl sm:px-5"
                 >
                   <span>
                     <Camera
                       size={39}
-                      className="mx-auto text-[#41658f]"
+                      className="mx-auto h-8 w-8 text-[#41658f] sm:h-[39px] sm:w-[39px]"
                       strokeWidth={2.1}
                     />
-                    <strong className="mt-3 block text-[17px] font-black text-[#10264c]">
+                    <strong className="mt-2 block text-[14px] font-black text-[#10264c] sm:mt-3 sm:text-[17px]">
                       {uploadBusy
                         ? "Đang tải ảnh..."
                         : "Bổ sung ảnh đơn đã tạo"}
                     </strong>
-                    <span className="mt-1 block text-[15px] font-medium text-slate-500">
+                    <span className="mt-1 block text-[12px] font-medium text-slate-500 sm:text-[15px]">
                       Nhấn để chọn ảnh hoặc kéo thả
                     </span>
                   </span>
@@ -832,16 +831,6 @@ export default function OrderPack({ unitId }: { unitId: number }) {
               />
             </div>
 
-            <div className="flex items-start gap-3 rounded-2xl bg-blue-50/80 p-5 text-[#46658c]">
-              <Info size={27} className="mt-0.5 shrink-0 text-blue-500" />
-              <ul className="space-y-3 text-[15px] font-medium leading-6">
-                <li>• Nhấn vào ảnh để xem kích thước lớn.</li>
-                <li>• Có thể chọn nhiều ảnh cùng lúc.</li>
-                <li>
-                  • Đã chọn {selectedCount} ảnh. Mỗi ảnh tối đa 8 MB.
-                </li>
-              </ul>
-            </div>
           </div>
 
           <style>{`
@@ -852,6 +841,12 @@ export default function OrderPack({ unitId }: { unitId: number }) {
             }
 
             @media (max-width: 560px) {
+              .order-pack-empty-image,
+              .order-pack-upload {
+                min-height: 105px !important;
+                min-width: 0 !important;
+              }
+
               .order-pack-image-layout button[style*="width: 190px"] {
                 width: 145px !important;
                 height: 135px !important;
@@ -890,8 +885,8 @@ export default function OrderPack({ unitId }: { unitId: number }) {
           >
             <Link
               href="/azalas/orders"
-              style={{ minHeight: 58 }}
-              className="inline-flex items-center justify-center gap-2 rounded-2xl border-2 border-blue-400 bg-white px-5 text-[17px] font-black text-blue-700 transition hover:bg-blue-50"
+              style={{ minHeight: 48 }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl border-2 border-blue-400 bg-white px-4 text-[14px] font-black text-blue-700 transition hover:bg-blue-50 sm:rounded-2xl sm:px-5 sm:text-[17px]"
             >
               <ArrowLeft size={21} strokeWidth={2.5} />
               Quay lại
@@ -902,13 +897,13 @@ export default function OrderPack({ unitId }: { unitId: number }) {
               disabled={busy}
               onClick={() => void startPacking()}
               style={{
-                minHeight: 58,
+                minHeight: 48,
                 width: "100%",
                 display: "inline-flex",
                 visibility: "visible",
                 opacity: busy ? 0.5 : 1,
               }}
-              className="items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-green-500 px-5 text-[20px] font-black text-white shadow-[0_12px_24px_rgba(5,150,95,0.18)] transition hover:brightness-105"
+              className="items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-green-500 px-4 text-[15px] font-black text-white shadow-[0_10px_20px_rgba(5,150,95,0.16)] transition hover:brightness-105 sm:gap-3 sm:rounded-2xl sm:px-5 sm:text-[20px]"
             >
               <CirclePlay size={26} fill="currentColor" />
               {busy

@@ -373,9 +373,6 @@ export default function OrdersBoard() {
             Chi tiết đơn
           </h1>
 
-          <p className="mt-2 text-[12px] font-bold text-slate-500 sm:mt-3 sm:text-[16px]">
-            Đơn Mới · Đang Soạn · Đơn Nợ · Khách Đặt
-          </p>
         </div>
       </div>
 
@@ -478,27 +475,27 @@ export default function OrdersBoard() {
             return (
               <section
                 key={warehouseName}
-                className="overflow-hidden rounded-[22px] border p-4 shadow-[0_10px_28px_rgba(28,69,128,0.045)] sm:p-5"
+                className="overflow-hidden rounded-[18px] border p-3 shadow-[0_7px_20px_rgba(28,69,128,0.04)] sm:rounded-[22px] sm:p-5 sm:shadow-[0_10px_28px_rgba(28,69,128,0.045)]"
                 style={{
                   borderColor: palette.border,
                   background: palette.panel,
                 }}
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2.5 sm:gap-4">
                   <div
-                    className="grid h-12 w-12 shrink-0 place-items-center rounded-xl"
+                    className="grid h-9 w-9 shrink-0 place-items-center rounded-lg sm:h-12 sm:w-12 sm:rounded-xl"
                     style={{
                       background: palette.soft,
                       color: palette.accent,
                     }}
                   >
-                    <Home size={27} strokeWidth={2.4} />
+                    <Home className="h-5 w-5 sm:h-[27px] sm:w-[27px]" strokeWidth={2.4} />
                   </div>
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3">
                       <h2
-                        className="m-0 text-[25px] font-black tracking-[-0.4px]"
+                        className="m-0 text-[20px] font-black tracking-[-0.25px] sm:text-[25px] sm:tracking-[-0.4px]"
                         style={{ color: palette.accentDark }}
                       >
                         {warehouseName}
@@ -508,7 +505,7 @@ export default function OrdersBoard() {
                       </h2>
 
                       <span
-                        className="rounded-xl px-3 py-1.5 text-[15px] font-black"
+                        className="rounded-lg px-2.5 py-1 text-[12px] font-black sm:rounded-xl sm:px-3 sm:py-1.5 sm:text-[15px]"
                         style={{
                           color: palette.accentDark,
                           background: palette.badge,
@@ -518,7 +515,7 @@ export default function OrdersBoard() {
                       </span>
                     </div>
 
-                    <p className="mt-1 text-[15px] font-medium text-slate-500">
+                    <p className="mt-0.5 text-[12px] font-medium leading-4 text-slate-500 sm:mt-1 sm:text-[15px] sm:leading-normal">
                       {warehouseName === "Khách đặt"
                         ? "Danh sách đơn khách đặt"
                         : `Danh sách đơn cần soạn tại kho ${warehouseName}`}
@@ -526,39 +523,39 @@ export default function OrdersBoard() {
                   </div>
 
                   <span
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl"
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-10 sm:w-10 sm:rounded-xl"
                     style={{
                       color: palette.accentDark,
                       background: palette.badge,
                     }}
                   >
-                    <ChevronUp size={21} strokeWidth={2.5} />
+                    <ChevronUp className="h-4 w-4 sm:h-[21px] sm:w-[21px]" strokeWidth={2.5} />
                   </span>
                 </div>
 
-                <div className="mt-5 grid gap-4 xl:grid-cols-3 md:grid-cols-2">
+                <div className="mt-3 grid gap-2.5 sm:mt-5 sm:gap-4 xl:grid-cols-3 md:grid-cols-2">
                   {entry.rows.map((unit) => {
                     const group = groupMap.get(unit.group_id)!;
 
                     return (
                       <article
                         key={unit.id}
-                        className="flex min-h-[205px] flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_8px_22px_rgba(26,62,115,0.07)]"
+                        className="flex min-h-[150px] flex-col rounded-xl border border-slate-200 bg-white p-3.5 shadow-[0_5px_14px_rgba(26,62,115,0.055)] sm:min-h-[205px] sm:rounded-2xl sm:p-5 sm:shadow-[0_8px_22px_rgba(26,62,115,0.07)]"
                         style={{
                           borderLeftWidth: 4,
                           borderLeftColor: palette.accent,
                         }}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <strong className="break-all text-[17px] font-black text-[#102b55]">
+                        <div className="flex items-start justify-between gap-2 sm:gap-3">
+                          <strong className="break-all text-[14px] font-black text-[#102b55] sm:text-[17px]">
                             {unit.order_code}
                           </strong>
 
                           {group.is_urgent && (
-                            <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5 text-[13px] font-black text-red-600">
+                            <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-red-50 px-2 py-1 text-[11px] font-black text-red-600 sm:gap-1.5 sm:rounded-lg sm:px-3 sm:py-1.5 sm:text-[13px]">
                               <Flame
+                                className="h-3.5 w-3.5 text-orange-500 sm:h-4 sm:w-4"
                                 size={16}
-                                className="text-orange-500"
                                 fill="currentColor"
                               />
                               GẤP
@@ -566,14 +563,14 @@ export default function OrdersBoard() {
                           )}
                         </div>
 
-                        <p className="mt-4 text-[20px] font-black text-[#102b55]">
+                        <p className="mt-2 text-[16px] font-black text-[#102b55] sm:mt-4 sm:text-[20px]">
                           {group.customer_name}
                         </p>
 
-                        <div className="mt-2 flex items-center gap-2 text-[15px] font-medium text-slate-500">
+                        <div className="mt-1.5 flex items-center gap-1.5 text-[12px] font-medium text-slate-500 sm:mt-2 sm:gap-2 sm:text-[15px]">
                           <CalendarDays
-                            size={17}
-                            className="text-[#143d73]"
+                            size={15}
+                            className="text-[#143d73] sm:h-[17px] sm:w-[17px]"
                           />
                           Ngày giao:{" "}
                           {group.delivery_date
@@ -582,7 +579,7 @@ export default function OrdersBoard() {
                         </div>
 
                         {unit.status === "DANG_SOAN" && (
-                          <p className="mt-2 text-[14px] font-semibold text-orange-700">
+                          <p className="mt-1.5 text-[12px] font-semibold text-orange-700 sm:mt-2 sm:text-[14px]">
                             Người soạn: {unit.started_by_name || "Chưa rõ"}
                           </p>
                         )}
@@ -594,16 +591,16 @@ export default function OrdersBoard() {
                           </p>
                         )}
 
-                        <div className="mt-auto border-t border-slate-200 pt-4">
+                        <div className="mt-auto border-t border-slate-200 pt-2.5 sm:pt-4">
                           <div className="flex items-center gap-2">
                             <Link
                               href={`/azalas/orders/${unit.id}/pack`}
-                              className="inline-flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-[14px] font-extrabold text-white shadow-sm transition hover:brightness-105"
+                              className="inline-flex min-h-[38px] flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[13px] font-extrabold text-white shadow-sm transition hover:brightness-105 sm:min-h-[44px] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-[14px]"
                               style={{
                                 background: `linear-gradient(135deg, ${palette.accent}, ${palette.accentDark})`,
                               }}
                             >
-                              <Eye size={18} strokeWidth={2.4} />
+                              <Eye className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.4} />
                               Xem đơn
                             </Link>
 
@@ -621,13 +618,13 @@ export default function OrdersBoard() {
                                   )
                                 }
                                 className={
-                                  "grid h-[44px] w-[44px] shrink-0 place-items-center rounded-xl border transition disabled:opacity-50 " +
+                                  "grid h-[38px] w-[38px] shrink-0 place-items-center rounded-lg border transition disabled:opacity-50 sm:h-[44px] sm:w-[44px] sm:rounded-xl " +
                                   (actionOpenId === unit.id
                                     ? "border-red-300 bg-red-50 text-red-600"
                                     : "border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600")
                                 }
                               >
-                                <Trash2 size={19} strokeWidth={2.2} />
+                                <Trash2 className="h-4 w-4 sm:h-[19px] sm:w-[19px]" strokeWidth={2.2} />
                               </button>
                             )}
                           </div>
