@@ -631,7 +631,7 @@ export default function AppShell({
         }
 
         .az-mobile-bottom-nav {
-          display: none;
+          display: none !important;
         }
 
         @media (max-width: 900px) {
@@ -648,7 +648,7 @@ export default function AppShell({
           }
 
           .az-main-v2 {
-            padding-bottom: 100px;
+            padding-bottom: 28px;
           }
 
           .az-mobile-bottom-nav {

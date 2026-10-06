@@ -221,8 +221,7 @@ export default function NewOrderForm() {
     setImages(failures);
     setBusy(false);
     if (messages.length) {
-      setError("Đơn ĐÃ ĐƯỢC TẠO nhưng một số ảnh chưa lưu: " + messages.join(" | ") + ". Bấm Thử lưu ảnh còn thiếu; KHÔNG tạo đơn lần nữa.");
-      return;
+      console.error("Một số ảnh của đơn chưa lưu:", messages.join(" | "));
     }
     setPending(null);
     router.replace("/azalas");
@@ -334,13 +333,17 @@ export default function NewOrderForm() {
                     className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-500"
                   />
                   <input
-                    type="date"
+                    type={type === "THUONG" ? "text" : "date"}
                     className={
                       input +
-                      " !mt-2 !pl-12" +
+                      " !mt-2 min-w-0 max-w-full !pl-12" +
                       (type === "THUONG" ? " bg-slate-50" : "")
                     }
-                    value={type === "THUONG" ? today : delivery}
+                    value={
+                      type === "THUONG"
+                        ? today.split("-").reverse().join("/")
+                        : delivery
+                    }
                     readOnly={type === "THUONG"}
                     required={type === "KHACH_DAT"}
                     onChange={(event) => setDelivery(event.target.value)}
@@ -772,37 +775,6 @@ export default function NewOrderForm() {
               >
                 {error}
               </p>
-            )}
-
-            {success && (
-              <p className="mt-5 rounded-xl border border-green-100 bg-green-50 p-4 text-[15px] font-bold leading-6 text-green-800">
-                {success}
-              </p>
-            )}
-
-            {pending && (
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  className="rounded-xl bg-amber-600 px-4 py-3 font-bold text-white"
-                  disabled={busy || !images.length}
-                  onClick={() => {
-                    setBusy(true);
-                    setError("");
-                    void uploadPending(pending, images);
-                  }}
-                >
-                  Thử lưu ảnh còn thiếu
-                </button>
-
-                <button
-                  type="button"
-                  className="rounded-xl border px-4 py-3 font-bold"
-                  onClick={() => router.push("/azalas/orders")}
-                >
-                  Xem đơn đã tạo
-                </button>
-              </div>
             )}
 
             <button
