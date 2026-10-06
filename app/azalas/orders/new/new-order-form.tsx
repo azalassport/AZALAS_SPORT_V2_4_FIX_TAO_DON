@@ -3,13 +3,29 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  CalendarDays,
+  ClipboardList,
+  FileText,
+  Flame,
+  Home,
+  Image as ImageIcon,
+  Info,
+  Paperclip,
+  Pencil,
+  Plus,
+  Search,
+  StickyNote,
+  UserRound,
+  Warehouse as WarehouseIcon,
+} from "lucide-react";
 
 type Customer = { id: number; name: string; phone: string | null };
 type Warehouse = { id: number; code: string; name: string };
 type Result = { group_id: number; root_code: string; units: { id: number; order_code: string; warehouse: string }[] };
 type DraftImage = { id: string; file: File; previewUrl: string; uploadedPath?: string };
 
-const input = "mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-base outline-none focus:border-blue-500";
+const input = "mt-2 w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-[17px] font-medium text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100";
 const acceptedImages = new Set(["image/png", "image/jpeg", "image/webp"]);
 const maxImageBytes = 8 * 1024 * 1024;
 
@@ -260,135 +276,577 @@ export default function NewOrderForm() {
   }
 
   if (role && role !== "OWNER" && role !== "ADMIN") {
-    return <p className="rounded-xl bg-red-50 p-4">Tài khoản MEMBER không được tạo đơn.</p>;
+    return (
+      <p className="rounded-2xl border border-red-100 bg-red-50 p-5 text-[16px] font-bold text-red-800">
+        Tài khoản MEMBER không được tạo đơn.
+      </p>
+    );
   }
 
-  return <>
-    <form onSubmit={saveOrder} className="space-y-5 rounded-2xl border bg-white p-4 shadow-sm sm:p-6">
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-semibold">Ngày tạo (tự động)
-          <input className={input + " bg-slate-100"} readOnly value={createdAt} />
-        </label>
-        <label className="text-sm font-semibold">Ngày giao hàng {type === "KHACH_DAT" ? "*" : "(tự động: hôm nay)"}
-          <input type="date" className={input + (type === "THUONG" ? " bg-slate-100" : "")}
-            value={type === "THUONG" ? today : delivery}
-            readOnly={type === "THUONG"} required={type === "KHACH_DAT"}
-            onChange={(event) => setDelivery(event.target.value)} />
-          {type === "KHACH_DAT" && <span className="mt-1 block text-xs font-medium text-rose-700">Khách đặt phải chọn ngày giao trước khi tạo đơn.</span>}
-        </label>
-      </div>
+  return (
+    <>
+      <form
+        onSubmit={saveOrder}
+        className="overflow-hidden rounded-[26px] border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.07)]"
+      >
+        <div className="flex items-center gap-4 border-b border-slate-100 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-blue-50 text-blue-600 sm:h-16 sm:w-16">
+            <ClipboardList size={31} strokeWidth={2.2} />
+          </div>
 
-      <fieldset>
-        <legend className="mb-2 font-bold">Loại đơn</legend>
-        <div className="flex gap-4">
-          {(["THUONG", "KHACH_DAT"] as const).map((kind) => <label key={kind} className="flex items-center gap-2">
-            <input type="radio" checked={type === kind} onChange={() => {
-              setType(kind); setWhCodes([]); setDelivery(""); setError("");
-            }} />{kind === "THUONG" ? "Thường" : "Khách đặt"}
-          </label>)}
+          <div>
+            <h2 className="m-0 text-[28px] font-black leading-tight tracking-[-0.4px] text-slate-950 sm:text-[32px]">
+              Tạo đơn hàng
+            </h2>
+            <p className="mt-1 text-[15px] font-medium text-slate-500 sm:text-[16px]">
+              Điền đầy đủ thông tin để tạo đơn hàng mới
+            </p>
+          </div>
         </div>
-      </fieldset>
 
-      {type === "THUONG" && <fieldset className="rounded-xl bg-blue-50 p-4">
-        <legend className="font-bold">Chọn kho (có thể tick nhiều)</legend>
-        <div className="mt-2 flex flex-wrap gap-5">{warehouses.map((warehouse) => <label key={warehouse.id} className="flex items-center gap-2">
-          <input type="checkbox" checked={whCodes.includes(warehouse.code)} onChange={(event) => setWhCodes((old) =>
-            event.target.checked ? [...old, warehouse.code] : old.filter((code) => code !== warehouse.code),
-          )} />{warehouse.name} ({warehouse.code})
-        </label>)}</div>
-        {!showNewWarehouse ? <button type="button" className="btn soft mt-4" disabled={busy}
-          onClick={() => setShowNewWarehouse(true)}>+ Thêm kho</button> :
-          <div className="mt-4 rounded-xl border border-blue-200 bg-white p-3">
-            <label className="block text-sm font-semibold">Tên kho mới (OWNER / ADMIN)
-              <input autoFocus className={input} placeholder="Ví dụ: Kho Hóc Môn" value={newWarehouseName}
-                onChange={(event) => setNewWarehouseName(event.target.value)}
-                onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void addWarehouse(); } }} />
-            </label>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <button type="button" className="btn primary" disabled={warehouseBusy || busy || !newWarehouseName.trim()}
-                onClick={() => void addWarehouse()}>{warehouseBusy ? "Đang lưu kho..." : "Lưu kho"}</button>
-              <button type="button" className="btn soft" disabled={warehouseBusy} onClick={() => {
-                setShowNewWarehouse(false); setNewWarehouseName("");
-              }}>Hủy</button>
+        <div className="space-y-6 p-4 sm:p-6">
+          <div className="rounded-[22px] border border-slate-200 bg-white p-4 sm:p-5">
+            <div className="grid gap-5 lg:grid-cols-[56px_1fr_1fr] lg:items-start">
+              <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-blue-600 lg:mt-[30px] lg:grid">
+                <CalendarDays size={28} strokeWidth={2.2} />
+              </div>
+
+              <label className="text-[17px] font-extrabold text-slate-900">
+                Ngày tạo (tự động)
+                <div className="relative">
+                  <CalendarDays
+                    size={20}
+                    className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                  />
+                  <input
+                    className={input + " !mt-2 bg-slate-50 !pl-12"}
+                    readOnly
+                    value={createdAt}
+                  />
+                </div>
+              </label>
+
+              <label className="text-[17px] font-extrabold text-slate-900">
+                Ngày giao hàng {type === "KHACH_DAT" ? "*" : "(tự động: hôm nay)"}
+                <div className="relative">
+                  <CalendarDays
+                    size={20}
+                    className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                  />
+                  <input
+                    type="date"
+                    className={
+                      input +
+                      " !mt-2 !pl-12" +
+                      (type === "THUONG" ? " bg-slate-50" : "")
+                    }
+                    value={type === "THUONG" ? today : delivery}
+                    readOnly={type === "THUONG"}
+                    required={type === "KHACH_DAT"}
+                    onChange={(event) => setDelivery(event.target.value)}
+                  />
+                </div>
+
+                {type === "KHACH_DAT" && (
+                  <span className="mt-2 block text-[14px] font-semibold text-rose-700">
+                    Khách đặt phải chọn ngày giao trước khi tạo đơn.
+                  </span>
+                )}
+              </label>
             </div>
-          </div>}
-        <p className="mt-2 text-xs text-blue-900">Mỗi kho được chọn sẽ tạo đơn soạn riêng. Kho mới được cấp mã tự động.</p>
-      </fieldset>}
 
-      <section className="space-y-2">
-        <div className="flex items-center justify-between"><label className="font-bold">Khách hàng *</label>
-          <button type="button" onClick={() => setAddCustomer((old) => !old)} className="rounded-lg bg-blue-100 px-3 py-2 text-sm font-bold text-blue-800">+ Thêm khách</button>
-        </div>
-        <input className={input} placeholder="Tìm theo tên hoặc số điện thoại" value={customerSearch}
-          onChange={(event) => { setCustomerSearch(event.target.value); setCustomerId(0); }} />
-        {!customerId && customerSearch && <div className="max-h-48 overflow-auto rounded-xl border">
-          {matches.map((customer) => <button key={customer.id} type="button" onClick={() => {
-            setCustomerId(customer.id); setCustomerSearch(customer.name);
-          }} className="block w-full border-b p-3 text-left hover:bg-blue-50">{customer.name} {customer.phone && `· ${customer.phone}`}</button>)}
-        </div>}
-        {customerId > 0 && <div className="text-sm font-semibold text-green-700">✓ Đã chọn khách #{customerId}</div>}
-        {addCustomer && <div className="grid gap-3 rounded-xl border bg-slate-50 p-4 sm:grid-cols-2">
-          {([ ["name", "Tên khách *"], ["phone", "SĐT"], ["address", "Địa chỉ"],
-            ["transport_station", "Chành xe"], ["transport_phone", "SĐT chành xe"] ] as const).map(([key, label]) =>
-            <label key={key} className="text-sm">{label}<input className={input} value={newCustomer[key]}
-              onChange={(event) => setNewCustomer((old) => ({ ...old, [key]: event.target.value }))} /></label>)}
-          <button type="button" onClick={() => void createCustomer()} className="rounded-lg bg-blue-700 p-3 font-semibold text-white">Lưu khách và chọn</button>
-        </div>}
-      </section>
+            <div className="mt-6 grid gap-4 lg:grid-cols-[56px_1fr]">
+              <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-blue-50 text-blue-600 lg:grid">
+                <FileText size={28} strokeWidth={2.2} />
+              </div>
 
-      <label className="flex items-center gap-3 rounded-xl bg-red-50 p-4 font-semibold text-red-800">
-        <input type="checkbox" checked={urgent} onChange={(event) => setUrgent(event.target.checked)} />🔥 Đơn GẤP
-      </label>
+              <fieldset>
+                <legend className="mb-3 text-[18px] font-extrabold text-slate-900">
+                  Loại đơn
+                </legend>
 
-      <section className="space-y-3">
-        <label className="block font-semibold">Ảnh đơn (có thể chọn nhiều ảnh, hoặc Ctrl + V vào vùng bên dưới)
-          <input className={input} type="file" accept="image/png,image/jpeg,image/webp" multiple disabled={busy}
-            onChange={(event) => { addImages(Array.from(event.currentTarget.files || [])); event.currentTarget.value = ""; }} />
-        </label>
-        <div tabIndex={0} onPaste={(event) => {
-          const pasted = Array.from(event.clipboardData.files).filter((file) => file.type.startsWith("image/"));
-          if (pasted.length) { event.preventDefault(); addImages(pasted); }
-        }} className="rounded-xl border-2 border-dashed border-blue-300 bg-blue-50 p-5 text-sm text-blue-900 focus:outline-blue-500">
-          Bấm vào đây rồi nhấn Ctrl + V để dán ảnh. Đã chọn <strong>{images.length} ảnh</strong>.
-          <span className="mt-1 block text-xs">Ảnh xem trước ở bên dưới; khi tạo đơn hệ thống lưu file ảnh gốc.</span>
-        </div>
-        {images.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" aria-label="Ảnh xem trước của đơn hàng">
-          {images.map((image, index) => <div key={image.id} className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-            <button type="button" className="block w-full" onClick={() => setZoomId(image.id)} title="Bấm để xem ảnh lớn">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={image.previewUrl} alt={`Ảnh đơn xem trước ${index + 1}: ${image.file.name}`}
-                className="h-36 w-full rounded-lg bg-slate-100 object-contain" />
+                <div className="grid max-w-[680px] gap-3 sm:grid-cols-2">
+                  {(["THUONG", "KHACH_DAT"] as const).map((kind) => {
+                    const checked = type === kind;
+
+                    return (
+                      <label
+                        key={kind}
+                        className={
+                          "flex min-h-[58px] cursor-pointer items-center gap-4 rounded-xl border px-5 py-3 text-[17px] font-bold transition " +
+                          (checked
+                            ? "border-blue-500 bg-blue-50 text-slate-950 shadow-[0_6px_16px_rgba(37,99,235,0.08)]"
+                            : "border-slate-300 bg-white text-slate-800 hover:border-blue-300")
+                        }
+                      >
+                        <input
+                          type="radio"
+                          className="h-6 w-6 shrink-0 accent-blue-600"
+                          checked={checked}
+                          onChange={() => {
+                            setType(kind);
+                            setWhCodes([]);
+                            setDelivery("");
+                            setError("");
+                          }}
+                        />
+
+                        <FileText
+                          size={23}
+                          strokeWidth={2.1}
+                          className={checked ? "text-blue-600" : "text-slate-500"}
+                        />
+
+                        {kind === "THUONG" ? "Thường" : "Khách đặt"}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            </div>
+
+            {type === "THUONG" && (
+              <fieldset className="mt-7 rounded-[20px] border border-blue-100 bg-blue-50/55 p-4 sm:p-5">
+                <legend className="px-1 text-[18px] font-extrabold text-slate-900">
+                  Chọn kho (có thể tick nhiều)
+                </legend>
+
+                <div className="grid gap-4 lg:grid-cols-[56px_1fr_auto] lg:items-center">
+                  <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-600 lg:grid">
+                    <WarehouseIcon size={28} strokeWidth={2.2} />
+                  </div>
+
+                  <div className="flex flex-wrap gap-3">
+                    {warehouses.map((warehouse, index) => {
+                      const picked = whCodes.includes(warehouse.code);
+
+                      return (
+                        <label
+                          key={warehouse.id}
+                          className={
+                            "flex min-h-[60px] min-w-[250px] cursor-pointer items-center gap-4 rounded-xl border bg-white px-5 py-3 text-[17px] font-semibold text-slate-900 transition " +
+                            (picked
+                              ? "border-blue-400 shadow-[0_7px_18px_rgba(37,99,235,0.08)]"
+                              : "border-slate-200 hover:border-blue-300")
+                          }
+                        >
+                          <input
+                            type="checkbox"
+                            className="h-6 w-6 shrink-0 accent-blue-600"
+                            checked={picked}
+                            onChange={(event) =>
+                              setWhCodes((old) =>
+                                event.target.checked
+                                  ? [...old, warehouse.code]
+                                  : old.filter((code) => code !== warehouse.code),
+                              )
+                            }
+                          />
+
+                          <Home
+                            size={27}
+                            strokeWidth={2.3}
+                            className={index % 2 === 0 ? "text-orange-500" : "text-emerald-600"}
+                          />
+
+                          <span>
+                            {warehouse.name} ({warehouse.code})
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
+
+                  {!showNewWarehouse ? (
+                    <button
+                      type="button"
+                      className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-100/80 px-5 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-200"
+                      disabled={busy}
+                      onClick={() => setShowNewWarehouse(true)}
+                    >
+                      <Plus size={21} strokeWidth={2.6} />
+                      Thêm kho
+                    </button>
+                  ) : null}
+                </div>
+
+                {showNewWarehouse && (
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
+                    <label className="block text-[16px] font-bold text-slate-800">
+                      Tên kho mới (OWNER / ADMIN)
+                      <input
+                        autoFocus
+                        className={input}
+                        placeholder="Ví dụ: Kho Hóc Môn"
+                        value={newWarehouseName}
+                        onChange={(event) => setNewWarehouseName(event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter") {
+                            event.preventDefault();
+                            void addWarehouse();
+                          }
+                        }}
+                      />
+                    </label>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn primary"
+                        disabled={warehouseBusy || busy || !newWarehouseName.trim()}
+                        onClick={() => void addWarehouse()}
+                      >
+                        {warehouseBusy ? "Đang lưu kho..." : "Lưu kho"}
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn soft"
+                        disabled={warehouseBusy}
+                        onClick={() => {
+                          setShowNewWarehouse(false);
+                          setNewWarehouseName("");
+                        }}
+                      >
+                        Hủy
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <p className="mt-4 flex items-start gap-2 rounded-xl bg-blue-50 px-4 py-3 text-[14px] font-medium leading-6 text-blue-800">
+                  <Info size={19} className="mt-0.5 shrink-0" />
+                  Mỗi kho được chọn sẽ tạo đơn soạn riêng. Kho mới được cấp mã tự động.
+                </p>
+              </fieldset>
+            )}
+
+            <section className="mt-7">
+              <div className="grid gap-4 lg:grid-cols-[56px_1fr]">
+                <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-indigo-50 text-indigo-500 lg:grid">
+                  <UserRound size={29} strokeWidth={2.2} />
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="text-[18px] font-extrabold text-slate-900">
+                      Khách hàng <span className="text-red-500">*</span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setAddCustomer((old) => !old)}
+                      className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-blue-100 px-5 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-200"
+                    >
+                      <Plus size={20} strokeWidth={2.6} />
+                      Thêm khách
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <Search
+                      size={22}
+                      className="pointer-events-none absolute left-4 top-1/2 z-10 -translate-y-1/2 text-slate-500"
+                    />
+                    <input
+                      className={input + " !mt-0 !pl-12"}
+                      placeholder="Tìm theo tên hoặc số điện thoại"
+                      value={customerSearch}
+                      onChange={(event) => {
+                        setCustomerSearch(event.target.value);
+                        setCustomerId(0);
+                      }}
+                    />
+                  </div>
+
+                  {!customerId && customerSearch && (
+                    <div className="max-h-48 overflow-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+                      {matches.map((customer) => (
+                        <button
+                          key={customer.id}
+                          type="button"
+                          onClick={() => {
+                            setCustomerId(customer.id);
+                            setCustomerSearch(customer.name);
+                          }}
+                          className="block w-full border-b border-slate-100 p-3.5 text-left text-[16px] font-medium hover:bg-blue-50"
+                        >
+                          {customer.name} {customer.phone && `· ${customer.phone}`}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {customerId > 0 && (
+                    <div className="text-[15px] font-bold text-green-700">
+                      ✓ Đã chọn khách #{customerId}
+                    </div>
+                  )}
+
+                  {addCustomer && (
+                    <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
+                      {(
+                        [
+                          ["name", "Tên khách *"],
+                          ["phone", "SĐT"],
+                          ["address", "Địa chỉ"],
+                          ["transport_station", "Chành xe"],
+                          ["transport_phone", "SĐT chành xe"],
+                        ] as const
+                      ).map(([key, label]) => (
+                        <label key={key} className="text-[15px] font-semibold text-slate-700">
+                          {label}
+                          <input
+                            className={input}
+                            value={newCustomer[key]}
+                            onChange={(event) =>
+                              setNewCustomer((old) => ({
+                                ...old,
+                                [key]: event.target.value,
+                              }))
+                            }
+                          />
+                        </label>
+                      ))}
+
+                      <button
+                        type="button"
+                        onClick={() => void createCustomer()}
+                        className="rounded-xl bg-blue-700 p-3.5 text-[16px] font-bold text-white"
+                      >
+                        Lưu khách và chọn
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <label className="mt-6 flex min-h-[64px] cursor-pointer items-center gap-4 rounded-2xl border border-red-100 bg-red-50 px-5 py-4 text-[18px] font-extrabold text-red-700">
+              <input
+                type="checkbox"
+                className="h-7 w-7 shrink-0 accent-red-600"
+                checked={urgent}
+                onChange={(event) => setUrgent(event.target.checked)}
+              />
+              <Flame size={24} className="text-orange-500" fill="currentColor" />
+              Đơn GẤP
+            </label>
+
+            <section className="mt-6">
+              <div className="grid gap-4 lg:grid-cols-[56px_1fr]">
+                <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-emerald-50 text-emerald-600 lg:grid">
+                  <Paperclip size={29} strokeWidth={2.3} />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="block text-[18px] font-extrabold text-slate-900">
+                    Ảnh đơn (có thể chọn nhiều ảnh, hoặc Ctrl + V vào vùng bên dưới)
+                  </label>
+
+                  <div className="rounded-xl border-2 border-dashed border-blue-300 bg-white p-3">
+                    <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-blue-50 px-4 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-100">
+                      <ImageIcon size={21} />
+                      Chọn tệp
+                      <input
+                        className="hidden"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        multiple
+                        disabled={busy}
+                        onChange={(event) => {
+                          addImages(Array.from(event.currentTarget.files || []));
+                          event.currentTarget.value = "";
+                        }}
+                      />
+                    </label>
+
+                    <span className="ml-4 text-[15px] font-medium text-slate-500">
+                      {images.length
+                        ? `Đã chọn ${images.length} ảnh`
+                        : "Không có tệp nào được chọn"}
+                    </span>
+                  </div>
+
+                  <div
+                    tabIndex={0}
+                    onPaste={(event) => {
+                      const pasted = Array.from(event.clipboardData.files).filter((file) =>
+                        file.type.startsWith("image/"),
+                      );
+
+                      if (pasted.length) {
+                        event.preventDefault();
+                        addImages(pasted);
+                      }
+                    }}
+                    className="rounded-xl bg-blue-50 px-4 py-3 text-[14px] font-medium leading-6 text-blue-800 focus:outline-blue-500"
+                  >
+                    <div className="flex gap-2">
+                      <Info size={19} className="mt-0.5 shrink-0" />
+                      <div>
+                        Bấm vào đây rồi nhấn Ctrl + V để dán ảnh. Đã chọn{" "}
+                        <strong>{images.length} ảnh</strong>.
+                        <span className="block">
+                          Ảnh xem trước ở bên dưới; khi tạo đơn hệ thống lưu file ảnh gốc.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {images.length > 0 && (
+                    <div
+                      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4"
+                      aria-label="Ảnh xem trước của đơn hàng"
+                    >
+                      {images.map((image, index) => (
+                        <div
+                          key={image.id}
+                          className="relative overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-sm"
+                        >
+                          <button
+                            type="button"
+                            className="block w-full"
+                            onClick={() => setZoomId(image.id)}
+                            title="Bấm để xem ảnh lớn"
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={image.previewUrl}
+                              alt={`Ảnh đơn xem trước ${index + 1}: ${image.file.name}`}
+                              className="h-36 w-full rounded-lg bg-slate-100 object-contain"
+                            />
+                          </button>
+
+                          <div
+                            className="mt-2 break-all text-xs text-slate-600"
+                            title={image.file.name}
+                          >
+                            {image.file.name}
+                          </div>
+
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => removeImage(image.id)}
+                            className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
+                            aria-label={`Xóa ảnh ${image.file.name}`}
+                          >
+                            ✕ Xóa ảnh này
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </section>
+
+            <div className="mt-6 grid gap-4 lg:grid-cols-[56px_1fr]">
+              <div className="hidden h-14 w-14 place-items-center rounded-2xl bg-amber-50 text-amber-500 lg:grid">
+                <StickyNote size={28} strokeWidth={2.2} />
+              </div>
+
+              <label className="block text-[18px] font-extrabold text-slate-900">
+                Ghi chú tạo đơn
+                <div className="relative">
+                  <Pencil
+                    size={21}
+                    className="pointer-events-none absolute left-4 top-6 z-10 text-slate-500"
+                  />
+                  <textarea
+                    className={input + " !pl-12"}
+                    rows={3}
+                    placeholder="Nhập ghi chú (nếu có)..."
+                    value={note}
+                    onChange={(event) => setNote(event.target.value)}
+                  />
+                </div>
+              </label>
+            </div>
+
+            {error && (
+              <p
+                role="alert"
+                className="mt-5 rounded-xl border border-red-100 bg-red-50 p-4 text-[15px] font-bold leading-6 text-red-800"
+              >
+                {error}
+              </p>
+            )}
+
+            {success && (
+              <p className="mt-5 rounded-xl border border-green-100 bg-green-50 p-4 text-[15px] font-bold leading-6 text-green-800">
+                {success}
+              </p>
+            )}
+
+            {pending && (
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  className="rounded-xl bg-amber-600 px-4 py-3 font-bold text-white"
+                  disabled={busy || !images.length}
+                  onClick={() => {
+                    setBusy(true);
+                    setError("");
+                    void uploadPending(pending, images);
+                  }}
+                >
+                  Thử lưu ảnh còn thiếu
+                </button>
+
+                <button
+                  type="button"
+                  className="rounded-xl border px-4 py-3 font-bold"
+                  onClick={() => router.push("/azalas/orders")}
+                >
+                  Xem đơn đã tạo
+                </button>
+              </div>
+            )}
+
+            <button
+              disabled={
+                busy ||
+                !customerId ||
+                (type === "THUONG" && !whCodes.length) ||
+                (type === "KHACH_DAT" && !delivery) ||
+                Boolean(success)
+              }
+              className="mt-6 inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-blue-700 via-blue-600 to-blue-400 px-5 py-4 text-[20px] font-black tracking-[0.01em] text-white shadow-[0_12px_26px_rgba(37,99,235,0.22)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Plus size={25} strokeWidth={2.7} />
+              {busy ? "Đang tạo đơn và lưu ảnh..." : "TẠO ĐƠN HÀNG"}
             </button>
-            <div className="mt-2 break-all text-xs text-slate-600" title={image.file.name}>{image.file.name}</div>
-            <button type="button" disabled={busy} onClick={() => removeImage(image.id)}
-              className="mt-2 w-full rounded-lg border border-red-200 bg-red-50 px-2 py-2 text-sm font-semibold text-red-700 disabled:opacity-50"
-              aria-label={`Xóa ảnh ${image.file.name}`}>✕ Xóa ảnh này</button>
-          </div>)}
-        </div>}
-      </section>
+          </div>
+        </div>
+      </form>
 
-      <label className="block font-semibold">Ghi chú tạo đơn
-        <textarea className={input} rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
-      </label>
-      {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-800">{error}</p>}
-      {success && <p className="rounded-xl bg-green-50 p-3 font-semibold text-green-800">{success}</p>}
-      {pending && <div className="flex flex-wrap gap-3">
-        <button type="button" className="rounded-xl bg-amber-600 px-4 py-3 font-bold text-white" disabled={busy || !images.length}
-          onClick={() => { setBusy(true); setError(""); void uploadPending(pending, images); }}>Thử lưu ảnh còn thiếu</button>
-        <button type="button" className="rounded-xl border px-4 py-3 font-bold" onClick={() => router.push("/azalas/orders")}>Xem đơn đã tạo</button>
-      </div>}
-      <button disabled={busy || !customerId || (type === "THUONG" && !whCodes.length) ||
-        (type === "KHACH_DAT" && !delivery) || Boolean(success)}
-        className="w-full rounded-xl bg-blue-700 px-5 py-4 text-lg font-extrabold text-white disabled:opacity-50">
-        {busy ? "Đang tạo đơn và lưu ảnh..." : "TẠO ĐƠN HÀNG"}
-      </button>
-    </form>
-    {zoomImage && <div role="dialog" aria-modal="true" aria-label="Xem ảnh đơn hàng" onClick={() => setZoomId(null)}
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4">
-      <button type="button" onClick={() => setZoomId(null)} className="absolute right-4 top-4 rounded-xl bg-white px-4 py-2 font-bold text-slate-900">✕ Đóng ảnh</button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={zoomImage.previewUrl} alt={zoomImage.file.name} onClick={(event) => event.stopPropagation()}
-        className="max-h-[88vh] max-w-full rounded-lg object-contain" />
-    </div>}
-  </>;
+      {zoomImage && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Xem ảnh đơn hàng"
+          onClick={() => setZoomId(null)}
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/90 p-4"
+        >
+          <button
+            type="button"
+            onClick={() => setZoomId(null)}
+            className="absolute right-4 top-4 rounded-xl bg-white px-4 py-2 font-bold text-slate-900"
+          >
+            ✕ Đóng ảnh
+          </button>
+
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={zoomImage.previewUrl}
+            alt={zoomImage.file.name}
+            onClick={(event) => event.stopPropagation()}
+            className="max-h-[88vh] max-w-full rounded-lg object-contain"
+          />
+        </div>
+      )}
+    </>
+  );
 }
