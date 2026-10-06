@@ -8,24 +8,42 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "check:syntax": "node scripts/check-source.mjs",
-    "check:env": "node scripts/check-env.mjs"
+    "check:env": "node scripts/check-env.mjs",
+    "dev:vinext": "vite dev --port 3001",
+    "build:vinext": "vite build",
+    "start:vinext": "vite preview",
+    "deploy:vinext": "vinext-cloudflare deploy"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.57.0",
+    "@vinext/cloudflare": "^1.0.1",
+    "html2canvas": "^1.4.1",
+    "lucide-react": "^0.468.0",
     "next": "16.3.6",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "@supabase/supabase-js": "^2.57.0",
-    "@supabase/ssr": "^0.6.1",
-    "lucide-react": "^0.468.0",
-    "html2canvas": "^1.4.1"
+    "react-server-dom-webpack": "^19.3.0",
+    "vinext": "^1.0.1"
   },
   "devDependencies": {
-    "typescript": "^5.8.3",
+    "@cloudflare/vite-plugin": "^2.0.0-beta.sha-52b0dc0e9",
     "@types/node": "^22.15.0",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
-    "tailwindcss": "^3.4.17",
+    "@vitejs/plugin-react": "^6.1.2",
+    "@vitejs/plugin-rsc": "^0.5.35",
     "autoprefixer": "^10.4.21",
-    "postcss": "^8.5.0"
+    "cf": "^1.0.0-beta.12",
+    "postcss": "^8.5.0",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.8.3",
+    "vite": "^8.3.0",
+    "vite-css-modules": "^1.16.0"
+  },
+  "type": "module",
+  "allowScripts": {
+    "workerd@1.20261001.1": true,
+    "workerd@1.20260930.2": true
   }
 }

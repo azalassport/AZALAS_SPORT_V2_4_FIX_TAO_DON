@@ -1,0 +1,21 @@
+import { bindings, defineConfig, defineWorker } from "cf/config";
+
+export default defineConfig({
+  worker: defineWorker({
+    name: "azalas-sport-full",
+    entrypoint: "vinext/server/fetch-handler",
+    compatibilityDate: "2026-10-06",
+    compatibilityFlags: ["nodejs_compat"],
+    assets: { notFoundHandling: "none" },
+    env: {
+      ASSETS: bindings.assets(),
+
+      // Supabase
+      // Các giá trị thật KHÔNG được ghi trực tiếp vào file này.
+      // Khi deploy, Cloudflare sẽ nhận chúng từ secrets.
+      NEXT_PUBLIC_SUPABASE_URL: bindings.secret(),
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: bindings.secret(),
+      SUPABASE_SERVICE_ROLE_KEY: bindings.secret(),
+    },
+  }),
+});

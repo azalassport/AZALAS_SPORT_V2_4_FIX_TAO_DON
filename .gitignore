@@ -7,3 +7,7 @@ out/
 .vercel
 .DS_Store
 *.log
+/dist/
+.vinext/
+.cloudflare/
+.env.cloudflare
