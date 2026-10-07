@@ -39,7 +39,7 @@ export default function AccountManager(){
     staff_id:"",
     login_name:"",
     password:"",
-    role:"MEMBER" as "ADMIN"|"MEMBER"
+    role:"MEMBER" as "OWNER"|"ADMIN"|"MEMBER"
   });
   const [busy,setBusy]=useState(false);
   const [loading,setLoading]=useState(true);
@@ -256,17 +256,18 @@ export default function AccountManager(){
             <select
               className="field mt-2"
               value={form.role}
-              onChange={e=>setForm(v=>({...v,role:e.target.value as "ADMIN"|"MEMBER"}))}
+              onChange={e=>setForm(v=>({...v,role:e.target.value as "OWNER"|"ADMIN"|"MEMBER"}))}
               disabled={meRole!=="OWNER"}
             >
               <option value="MEMBER">MEMBER</option>
               {meRole==="OWNER"&&<option value="ADMIN">ADMIN</option>}
+              {meRole==="OWNER"&&<option value="OWNER">OWNER</option>}
             </select>
           </label>
         </div>
 
         <p className="text-xs text-slate-500">
-          OWNER tạo được ADMIN/MEMBER. ADMIN chỉ tạo MEMBER. Không thể tạo OWNER từ giao diện.
+          OWNER tạo được OWNER/ADMIN/MEMBER. ADMIN chỉ tạo MEMBER. Tài khoản OWNER sau khi tạo sẽ được khóa bảo vệ như OWNER hiện tại.
         </p>
 
         <button

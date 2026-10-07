@@ -176,11 +176,16 @@ export async function POST(req: NextRequest) {
     validateLoginName(loginName);
     if (password.length < 6) throw new Error("Mật khẩu phải có ít nhất 6 ký tự");
 
-    if (!(["ADMIN","MEMBER"] as string[]).includes(role)) {
+    if (!(["OWNER","ADMIN","MEMBER"] as string[]).includes(role)) {
       throw new Error("Quyền không hợp lệ");
     }
+
     if (actorProfile.role === "ADMIN" && role !== "MEMBER") {
       throw new Error("ADMIN chỉ được tạo tài khoản MEMBER");
+    }
+
+    if (role === "OWNER" && actorProfile.role !== "OWNER") {
+      throw new Error("Chỉ OWNER được tạo thêm tài khoản OWNER");
     }
 
     const { data: duplicate } = await sb
