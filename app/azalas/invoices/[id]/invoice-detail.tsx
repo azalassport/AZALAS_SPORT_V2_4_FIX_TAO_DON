@@ -45,10 +45,6 @@ type ReturnEditRow = {
   quantity: string; unit_price: string;
 };
 type Unit = { id: number; group_id: number; order_code: string; packing_note: string | null };
-type ReadyUnit = {
-  unit_id: number; order_code: string; customer_id: number; customer_name: string;
-  warehouse_name: string; completed_at: string; packer_name: string; subtotal: number;
-};
 type Group = { id: number; root_code: string; creator_note: string | null };
 type PhotoGroup = { group_id: number; root_code: string; urls: string[] };
 
@@ -80,8 +76,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   const [editing, setEditing] = useState(false);
   const [lineDirty, setLineDirty] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
-  const [availableUnits, setAvailableUnits] = useState<ReadyUnit[]>([]);
-  const [unitBusyId, setUnitBusyId] = useState<number | null>(null);
   const [groups, setGroups] = useState<Group[]>([]);
   const [photoGroups, setPhotoGroups] = useState<PhotoGroup[]>([]);
   const [mediaError, setMediaError] = useState("");
@@ -116,7 +110,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       return;
     }
 
-    const [lineResult, paymentResult, linkResult, returnResult, returnLineResult, readyResult] = await Promise.all([
+    const [lineResult, paymentResult, linkResult, returnResult, returnLineResult] = await Promise.all([
       sb.from("invoice_lines")
         .select("id,product_name,color,size,quantity,unit_price,line_total")
         .eq("invoice_id", invoiceId).order("id"),
@@ -130,7 +124,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       sb.from("az_invoice_return_lines")
         .select("id,invoice_id,return_slip_id,source_return_item_id,line_no,product_name,quantity,unit_price,line_total")
         .eq("invoice_id", invoiceId).order("line_no"),
-      sb.rpc("az_invoice_ready_units"),
     ]);
     if (lineResult.error) setErr(lineResult.error.message);
     if (paymentResult.error) { setErr(paymentResult.error.message); setMediaError("Không tải được thanh toán hóa đơn: " + paymentResult.error.message); }
@@ -138,9 +131,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     if (returnResult.error || returnLineResult.error) {
       setMediaError("Không tải được hàng trả để xác nhận/chụp: " +
         (returnResult.error?.message || returnLineResult.error?.message));
-    }
-    if (readyResult.error && b.status === "CHUA_CHOT") {
-      setErr(readyResult.error.message);
     }
 
     const invoiceLines = ((lineResult.data || []) as Line[]).map(l => ({
@@ -231,11 +221,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       }
     }
     setUnits(nextUnits);
-    setAvailableUnits(
-      b.status === "CHUA_CHOT"
-        ? ((readyResult.data || []) as ReadyUnit[]).filter(r => Number(r.customer_id) === Number(b.customer_id))
-        : [],
-    );
     setGroups(nextGroups);
     setPhotoGroups(nextPhotoGroups);
     if (problems.length) setMediaError(problems.join(" | "));
@@ -275,6 +260,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   const due = subtotal + Number(bill?.old_debt_snapshot || 0) + extras;
   const remaining = due - paid;
   const draft = bill?.status === "CHUA_CHOT";
+  const orderCodes = units.map(u => u.order_code);
   const totalSourcePhotos = photoGroups.reduce((n, p) => n + p.urls.length, 0);
   // Phiếu CHƯA DUYỆT cùng mã khách tự hiện; không cần Gửi đề nghị từ Hàng trả.
   const eligibleReturns = returnSlips.filter(s => s.status === "CHUA_DUYET" &&
@@ -291,44 +277,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setPhotoPath("");
     setImageUrl("");
     setOk("");
-  }
-
-  async function setInvoiceUnit(unitId: number, checked: boolean) {
-    if (!bill || !draft || unitBusyId !== null) return;
-    if (editing || lineDirty || dirty || anyReturnDirty) {
-      setErr("Hãy lưu hoặc đóng các thay đổi sản phẩm / thanh toán / hàng trả trước khi tick đơn liên kết.");
-      return;
-    }
-
-    const currentIds = units.map(u => Number(u.id));
-    const nextIds = checked
-      ? Array.from(new Set([...currentIds, unitId]))
-      : currentIds.filter(id => id !== unitId);
-
-    if (!nextIds.length) {
-      setErr("Hóa đơn phải giữ ít nhất 1 đơn. Nếu không dùng bản nháp này, hãy bấm Xóa bản nháp.");
-      return;
-    }
-
-    setUnitBusyId(unitId);
-    setErr("");
-    setOk("");
-    const { error } = await sb.rpc("az_invoice_set_units", {
-      p_invoice_id: bill.id,
-      p_unit_ids: nextIds,
-    });
-    if (error) {
-      setUnitBusyId(null);
-      setErr(error.message);
-      return;
-    }
-
-    invalidatePhoto();
-    await load();
-    setUnitBusyId(null);
-    setOk(checked
-      ? "Đã đưa đơn vào hóa đơn. Sản phẩm và tổng tiền đã cập nhật; cần chụp lại ảnh trước khi chốt."
-      : "Đã bỏ đơn khỏi hóa đơn. Đơn này vẫn còn ở Chưa gửi để xử lý sau; cần chụp lại ảnh trước khi chốt.");
   }
   function editPayment(i: number, key: keyof Pay, value: string) {
     setPay(rows => rows.map((p, j) => i === j ? {
@@ -741,7 +689,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
         </span>
       </div>
 
-      <div className="flex flex-wrap justify-end gap-2 border-t border-blue-100 bg-white/80 px-5 py-4 sm:gap-3 sm:px-6">
+      <div className="flex flex-wrap gap-2 border-t border-blue-100 bg-white/80 px-5 py-4 sm:gap-3 sm:px-6">
         {draft && <>
           <button className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-extrabold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
             disabled={busy} onClick={resetDraft}><RotateCcw size={17} /> Reset</button>
@@ -766,47 +714,14 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
 
     <div ref={paper} className="mx-auto w-full max-w-4xl rounded-2xl border border-slate-200 border-t-[7px] border-t-blue-700 bg-white p-5 text-[19px] leading-relaxed text-slate-900 shadow-xl sm:p-9">
       <header className="mb-5 border-b-2 border-slate-800 pb-5 text-center">
-        <p className="text-[18px] font-extrabold tracking-[.15em] text-blue-700">AZALAS SPORT</p>
-        <h2 className="my-2 text-[32px] font-black tracking-tight text-slate-950 sm:text-[37px]">HÓA ĐƠN BÁN HÀNG</h2>
+        <h2 className="mb-2 text-[32px] font-black tracking-tight text-slate-950 sm:text-[37px]">HÓA ĐƠN BÁN HÀNG</h2>
         <p className="break-all text-[20px] font-bold text-blue-800">{bill.invoice_code}</p>
       </header>
       <div className="mb-5 grid gap-2 text-[19px] leading-7 sm:grid-cols-2 sm:text-[20px]">
         <div><span className="font-bold text-slate-600">Khách hàng: </span><b className="text-slate-950">{bill.customer_name}</b></div>
         <div className="sm:text-right"><span className="font-bold text-slate-600">Ngày: </span>{dt(bill.created_at)}</div>
-        <div className="sm:col-span-2">
-          <span className="font-bold text-slate-600">Đơn liên kết:</span>
-          <div className="mt-2 flex flex-wrap gap-2">
-            {units.map(u => <label key={u.id} className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 font-semibold text-blue-900">
-              {draft && <input
-                data-html2canvas-ignore="true"
-                type="checkbox"
-                className="size-5 accent-blue-600"
-                checked
-                disabled={unitBusyId !== null || busy || editing || lineDirty || dirty || anyReturnDirty}
-                onChange={() => void setInvoiceUnit(u.id, false)}
-              />}
-              <span className="break-all">{u.order_code}</span>
-            </label>)}
-            {!units.length && <span className="font-semibold text-slate-500">—</span>}
-          </div>
-
-          {draft && availableUnits.length > 0 && <div data-html2canvas-ignore="true" className="mt-3 rounded-xl border border-dashed border-blue-300 bg-blue-50/60 p-3">
-            <p className="mb-2 text-[14px] font-extrabold text-blue-800">Đơn cùng khách đang chờ · tick để đưa vào hóa đơn</p>
-            <div className="flex flex-wrap gap-2">
-              {availableUnits.map(u => <label key={u.unit_id} className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-white bg-white px-3 py-2 text-[16px] font-semibold text-slate-800 shadow-sm">
-                <input
-                  type="checkbox"
-                  className="size-5 accent-blue-600"
-                  checked={false}
-                  disabled={unitBusyId !== null || busy || editing || lineDirty || dirty || anyReturnDirty}
-                  onChange={() => void setInvoiceUnit(u.unit_id, true)}
-                />
-                <span className="break-all">{u.order_code}</span>
-                <span className="text-[13px] font-medium text-slate-500">{u.warehouse_name} · {money(u.subtotal)}</span>
-              </label>)}
-            </div>
-            <p className="mt-2 text-[13px] font-medium text-slate-500">Không tick thì đơn vẫn nằm ở Chưa gửi sau khi hóa đơn này được chốt.</p>
-          </div>}
+        <div className="sm:col-span-2"><span className="font-bold text-slate-600">Đơn liên kết: </span>
+          <span className="break-words font-semibold text-blue-800">{orderCodes.join(" · ") || "—"}</span>
         </div>
       </div>
 
@@ -886,7 +801,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
         {totalSourcePhotos === 0 && !mediaError && <p className="rounded-lg bg-slate-50 p-3 text-[17px] text-slate-600">Không có ảnh tạo đơn</p>}
         {mediaError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-[15px] text-red-800">Ảnh/ghi chú chưa tải đủ: {mediaError}</p>}
       </div>
-      <footer className="mt-7 border-t border-slate-200 pt-4 text-center text-[17px] text-slate-500">AZALAS Sport · Bứt phá doanh số – Làm chủ đường đua!</footer>
     </div>
 
     {/* Ghi chu nghiep vu duoc hien thi DUOI hoa don, ben NGOAI vung ref={paper}.
@@ -922,7 +836,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
         </span>
         <div>
           <h2 className={sectionTitleClass}>Hàng trả · xác nhận và sửa chi tiết</h2>
-          <p className="mt-1 text-[14px] leading-6 text-slate-500 sm:text-[15px]">Tự hiện phiếu CHƯA DUYỆT của đúng mã khách. Không cần gửi đề nghị. Bạn chọn phiếu, có thể sửa Tên SP / SL / Giá trên bản sao hóa đơn rồi xác nhận. Phiếu không chọn vẫn ở Chưa duyệt; phiếu trừ nợ trực tiếp không xuất hiện.</p>
         </div>
       </div>
       {eligibleReturns.length > 0 && <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm font-semibold text-blue-900">Có {eligibleReturns.length} phiếu hàng trả của khách đang chờ chọn. Chỉ những phiếu bạn XÁC NHẬN mới được cấn trừ khi chốt hóa đơn.</p>}
@@ -974,7 +887,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
         </span>
         <div>
           <h2 className={sectionTitleClass}>Thanh toán và điều chỉnh</h2>
-          <p className="mt-1 text-[14px] leading-6 text-slate-500 sm:text-[15px]">Hàng trả được xác nhận trong khung riêng ở trên. Sửa tiền/sản phẩm/hàng trả đều phải chụp lại ảnh.</p>
         </div>
       </div>
       {pay.map((p, i) => p.method === "HANG_TRA" ?
@@ -1009,7 +921,6 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       </div>
       {imageUrl && <ImageViewer urls={[imageUrl]} label="Ảnh hóa đơn" />}
       {draft ? <>
-        <p className="text-[14px] leading-6 text-slate-500 sm:text-[15px]">Ảnh chụp gồm hóa đơn và ảnh đính kèm của các đơn được chọn. Ghi chú tạo/soạn chỉ hiện bên dưới để nhân viên xem, không đưa vào ảnh gửi khách. Chỉ chốt khi ảnh đã lưu thành công.</p>
         <div className="flex flex-wrap gap-3">
           <button disabled={busy || editing || lineDirty || anyReturnDirty || pendingReturns.length > 0 || returnPaymentMismatch || !!mediaError} onClick={() => void capture()} className="btn primary">{busy ? "Đang chụp và lưu..." : "📷 Chụp, lưu ảnh và sao chép gửi Zalo"}</button>
           {photoPath && !dirty && !editing && !lineDirty && !anyReturnDirty && pendingReturns.length === 0 && !returnPaymentMismatch && <>

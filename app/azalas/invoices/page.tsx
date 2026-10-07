@@ -8,21 +8,22 @@ export default function Invoices() {
       <div className="mb-6 sm:mb-7">
         <Link
           href="/azalas"
-          className="mb-5 inline-flex items-center gap-2 text-[15px] font-extrabold text-blue-600 transition hover:text-blue-700"
+          className="inline-flex min-h-[40px] items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-3 py-2 text-[13px] font-black text-blue-700 shadow-[0_5px_14px_rgba(37,99,235,0.08)] transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 sm:min-h-[46px] sm:gap-2 sm:rounded-xl sm:px-4 sm:py-2.5 sm:text-[15px]"
         >
-          <ArrowLeft size={20} strokeWidth={2.4} />
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-blue-50 text-blue-700 sm:h-8 sm:w-8 sm:rounded-lg">
+            <ArrowLeft className="h-4 w-4 sm:h-[18px] sm:w-[18px]" strokeWidth={2.7} />
+          </span>
           Quay lại
         </Link>
 
-        <div className="text-[12px] font-black uppercase tracking-[0.2em] text-blue-700">
-          BÁN HÀNG / HÓA ĐƠN
+        <div className="mt-4 text-center">
+          <div className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700 sm:text-[12px] sm:tracking-[0.2em]">
+            BÁN HÀNG / HÓA ĐƠN
+          </div>
+          <h1 className="mt-2 text-[28px] font-black uppercase leading-tight tracking-[-0.7px] text-slate-950 sm:text-[42px] sm:tracking-[-1.2px]">
+            Trung tâm hóa đơn
+          </h1>
         </div>
-        <h1 className="mt-2 text-[34px] font-black leading-tight tracking-[-1.2px] text-slate-950 sm:text-[42px]">
-          Trung tâm hóa đơn
-        </h1>
-        <p className="mt-2 max-w-5xl text-[15px] leading-6 text-slate-600 sm:text-[16px]">
-          Chốt riêng từng kho hoặc chọn nhiều đơn đã soạn của cùng khách. Hóa đơn và ảnh đã chốt được lưu bất biến.
-        </p>
       </div>
 
       <InvoicesBoard />
