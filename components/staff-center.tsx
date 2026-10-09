@@ -1,6 +1,17 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  CalendarCheck2,
+  ChartNoAxesCombined,
+  HandCoins,
+  PencilLine,
+  ShieldCheck,
+  UserPlus,
+  UsersRound,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Loading, Msg } from "@/components/ui";
 import { money, vnToday } from "@/lib/azalas/format";
@@ -202,11 +213,47 @@ export default function StaffCenter(){
   }
 
 
-  const tabs:[Tab,string,string][]=[
-    ["CONG","Nhập công","Ngày công, tăng ca và thưởng"],["UNG","Nhập ứng","Ghi nhận tiền ứng nhân viên"],
-    ["SUA","Chỉnh sửa","Sửa giá công và phiếu sai"],["BAO_CAO","Báo cáo","Cá nhân và tổng quát xưởng"],
-    ["DS","DS nhân viên","Hồ sơ và lịch sử lương"],["TAI_KHOAN","Tài khoản","Phân quyền và bảo mật"],
+  const tabs = [
+    { key:"CONG" as Tab, title:"Nhập công", desc:"Ngày công, tăng ca và thưởng", icon:CalendarCheck2, tone:"blue" },
+    { key:"UNG" as Tab, title:"Nhập ứng", desc:"Ghi nhận tiền ứng nhân viên", icon:HandCoins, tone:"emerald" },
+    { key:"SUA" as Tab, title:"Chỉnh sửa", desc:"Sửa giá công và phiếu sai", icon:PencilLine, tone:"amber" },
+    { key:"BAO_CAO" as Tab, title:"Báo cáo", desc:"Cá nhân và tổng quát xưởng", icon:ChartNoAxesCombined, tone:"violet" },
+    { key:"DS" as Tab, title:"DS nhân viên", desc:"Hồ sơ và lịch sử lương", icon:UsersRound, tone:"cyan" },
+    { key:"TAI_KHOAN" as Tab, title:"Tài khoản", desc:"Phân quyền và bảo mật", icon:ShieldCheck, tone:"rose" },
   ];
+
+  const tabTone = {
+    blue: {
+      card:"border-blue-200 bg-gradient-to-br from-white to-blue-50/80",
+      icon:"bg-blue-100 text-blue-700",
+      active:"ring-2 ring-blue-500 border-blue-300 shadow-[0_14px_30px_rgba(37,99,235,.14)]",
+    },
+    emerald: {
+      card:"border-emerald-200 bg-gradient-to-br from-white to-emerald-50/80",
+      icon:"bg-emerald-100 text-emerald-700",
+      active:"ring-2 ring-emerald-500 border-emerald-300 shadow-[0_14px_30px_rgba(16,185,129,.14)]",
+    },
+    amber: {
+      card:"border-amber-200 bg-gradient-to-br from-white to-amber-50/80",
+      icon:"bg-amber-100 text-amber-700",
+      active:"ring-2 ring-amber-500 border-amber-300 shadow-[0_14px_30px_rgba(245,158,11,.14)]",
+    },
+    violet: {
+      card:"border-violet-200 bg-gradient-to-br from-white to-violet-50/80",
+      icon:"bg-violet-100 text-violet-700",
+      active:"ring-2 ring-violet-500 border-violet-300 shadow-[0_14px_30px_rgba(124,58,237,.14)]",
+    },
+    cyan: {
+      card:"border-cyan-200 bg-gradient-to-br from-white to-cyan-50/80",
+      icon:"bg-cyan-100 text-cyan-700",
+      active:"ring-2 ring-cyan-500 border-cyan-300 shadow-[0_14px_30px_rgba(6,182,212,.14)]",
+    },
+    rose: {
+      card:"border-rose-200 bg-gradient-to-br from-white to-rose-50/80",
+      icon:"bg-rose-100 text-rose-700",
+      active:"ring-2 ring-rose-500 border-rose-300 shadow-[0_14px_30px_rgba(244,63,94,.14)]",
+    },
+  } as const;
 
   if(loading)return <Loading/>;
   if(!manager)return <section className="panel"><Msg error="Chỉ OWNER/ADMIN được mở Trung tâm nhân sự."/></section>;
@@ -215,19 +262,107 @@ export default function StaffCenter(){
   const filtered=staff.filter(s=>`${s.display_name} ${s.phone||""}`.toLowerCase().includes(query.trim().toLowerCase()));
   const months=monthRange(reportFrom,reportTo);
 
-  return <div className="stack">
-    <Msg error={err} success={ok}/>
-    <section className="panel stack">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div><div className="text-xs font-extrabold tracking-widest text-blue-600">ĐIỀU HÀNH / NHÂN SỰ</div><h1 className="text-2xl font-extrabold">Trung tâm nhân sự</h1><p className="muted">Chấm công, ứng lương, báo cáo và phân quyền nhân viên trong một nơi.</p></div>
-        <button className="btn primary" onClick={()=>setShowAdd(true)}>+ Thêm nhân viên</button>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        {tabs.map(([k,t,s])=><button key={k} onClick={()=>setTab(k)} className={`rounded-2xl border p-4 text-left ${tab===k?"border-blue-500 bg-blue-50":"border-slate-200 bg-white"}`}><b className="block">{t}</b><span className="mt-1 block text-xs text-slate-500">{s}</span></button>)}
-      </div>
-    </section>
+  const linkedAccounts=staff.filter(x=>x.profile_id).length;
 
-    {tab==="CONG"&&<section className="panel stack">
+  return <main className="relative overflow-hidden rounded-[28px] bg-[radial-gradient(circle_at_86%_5%,rgba(219,234,254,.78),transparent_28%),linear-gradient(180deg,#f8fbff_0%,#eef6ff_100%)] px-4 py-5 sm:px-7 sm:py-7 lg:px-10 lg:py-9">
+    <div aria-hidden="true" className="pointer-events-none absolute -left-24 top-40 h-72 w-72 rounded-full bg-blue-100/55 blur-3xl"/>
+    <div aria-hidden="true" className="pointer-events-none absolute right-[-80px] top-[-60px] h-80 w-80 rounded-full bg-cyan-100/45 blur-3xl"/>
+
+    <div className="relative z-10 space-y-6">
+      <Msg error={err} success={ok}/>
+
+      <section className="rounded-[30px] border border-slate-200 bg-white/95 p-5 shadow-[0_18px_48px_rgba(15,23,42,.07)] sm:p-7">
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
+            <Link
+              href="/azalas"
+              className="inline-flex min-h-[42px] items-center gap-2 rounded-full border border-blue-300 bg-blue-50/90 px-4 py-2 text-[14px] font-black text-blue-700 shadow-[0_5px_14px_rgba(37,99,235,.08)] transition hover:-translate-y-0.5 hover:bg-white sm:min-h-[46px] sm:px-5 sm:text-[15px]"
+            >
+              <ArrowLeft className="h-[18px] w-[18px]" strokeWidth={2.7}/>
+              Quay lại
+            </Link>
+
+            <div className="mt-6 text-[13px] font-black uppercase tracking-[0.12em] text-blue-700 sm:text-[15px]">
+              ĐIỀU HÀNH / NHÂN SỰ
+            </div>
+
+            <h1 className="mt-2 text-[34px] font-black leading-none tracking-[-1px] text-[#0d2346] sm:text-[48px] lg:text-[54px]">
+              Trung tâm nhân sự
+            </h1>
+
+            <p className="mt-4 max-w-[760px] text-[15px] font-semibold leading-7 text-slate-500 sm:text-[18px]">
+              Chấm công, ứng lương, báo cáo và phân quyền nhân viên trong một nơi.
+            </p>
+          </div>
+
+          <div className="hidden shrink-0 lg:flex lg:flex-col lg:items-end lg:gap-4">
+            <div className="flex items-center gap-3 rounded-[26px] border border-blue-100 bg-gradient-to-br from-blue-50 to-cyan-50 px-5 py-4 shadow-[0_12px_28px_rgba(37,99,235,.08)]">
+              <div className="grid h-14 w-14 place-items-center rounded-2xl bg-white text-blue-600 shadow-sm">
+                <UsersRound className="h-7 w-7" strokeWidth={2.3}/>
+              </div>
+              <div>
+                <div className="text-[11px] font-black uppercase tracking-[0.08em] text-slate-400">Đang làm</div>
+                <div className="text-[30px] font-black leading-none text-[#0d2346]">{activeStaff.length}</div>
+              </div>
+            </div>
+
+            <button
+              className="inline-flex min-h-[48px] items-center gap-2 rounded-2xl bg-blue-600 px-5 text-[14px] font-black text-white shadow-[0_12px_26px_rgba(37,99,235,.25)] transition hover:-translate-y-0.5 hover:bg-blue-700"
+              onClick={()=>setShowAdd(true)}
+            >
+              <UserPlus className="h-5 w-5" strokeWidth={2.5}/>
+              Thêm nhân viên
+            </button>
+          </div>
+        </div>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-[22px] border border-blue-200 bg-gradient-to-br from-blue-50 to-white p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.08em] text-blue-600">Tổng nhân viên</div>
+            <div className="mt-2 text-[28px] font-black text-[#0d2346]">{staff.length}</div>
+          </div>
+          <div className="rounded-[22px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.08em] text-emerald-600">Đang làm</div>
+            <div className="mt-2 text-[28px] font-black text-emerald-800">{activeStaff.length}</div>
+          </div>
+          <div className="rounded-[22px] border border-violet-200 bg-gradient-to-br from-violet-50 to-white p-4">
+            <div className="text-[11px] font-black uppercase tracking-[0.08em] text-violet-600">Đã có tài khoản</div>
+            <div className="mt-2 text-[28px] font-black text-violet-800">{linkedAccounts}</div>
+          </div>
+        </div>
+
+        <button
+          className="mt-4 inline-flex min-h-[46px] w-full items-center justify-center gap-2 rounded-2xl bg-blue-600 px-5 text-[14px] font-black text-white shadow-[0_10px_22px_rgba(37,99,235,.20)] lg:hidden"
+          onClick={()=>setShowAdd(true)}
+        >
+          <UserPlus className="h-5 w-5" strokeWidth={2.5}/>
+          Thêm nhân viên
+        </button>
+
+        <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          {tabs.map((item)=>{
+            const Icon=item.icon;
+            const tone=tabTone[item.tone as keyof typeof tabTone];
+            const active=tab===item.key;
+
+            return <button
+              key={item.key}
+              onClick={()=>setTab(item.key)}
+              className={`group flex min-h-[112px] items-center gap-4 rounded-[24px] border p-4 text-left transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_30px_rgba(15,23,42,.08)] ${tone.card} ${active?tone.active:""}`}
+            >
+              <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-2xl ${tone.icon}`}>
+                <Icon className="h-7 w-7" strokeWidth={2.35}/>
+              </span>
+              <span className="min-w-0">
+                <b className="block text-[16px] font-black text-[#0d2346] sm:text-[17px]">{item.title}</b>
+                <span className="mt-1 block text-[12px] font-semibold leading-5 text-slate-500 sm:text-[13px]">{item.desc}</span>
+              </span>
+            </button>;
+          })}
+        </div>
+      </section>
+
+    {tab==="CONG"&&<section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6">
       <h2>Nhập công</h2>
       <div className="grid gap-3 md:grid-cols-2">
         <label>Tên Nhân Viên *<select className="field mt-2" value={congForm.staff_id} onChange={e=>setCongForm(v=>({...v,staff_id:e.target.value}))}><option value="">Chọn nhân viên</option>{activeStaff.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label>
@@ -240,25 +375,25 @@ export default function StaffCenter(){
     </section>}
 
     {tab==="UNG"&&<div className="stack">
-      <section className="panel stack"><h2>Nhập ứng</h2><div className="grid gap-3 md:grid-cols-2">
+      <section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6"><h2>Nhập ứng</h2><div className="grid gap-3 md:grid-cols-2">
         <label>Tên Nhân Viên *<select className="field mt-2" value={ungForm.staff_id} onChange={e=>setUngForm(v=>({...v,staff_id:e.target.value}))}><option value="">Chọn nhân viên</option>{activeStaff.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label>
         <label>Ngày Ứng *<input type="date" className="field mt-2" value={ungForm.date} onChange={e=>setUngForm(v=>({...v,date:e.target.value}))}/></label>
         <label>Số Tiền Ứng *<input type="number" className="field mt-2" value={ungForm.amount} onChange={e=>setUngForm(v=>({...v,amount:e.target.value}))}/></label>
         <label>Lý Do<input className="field mt-2" value={ungForm.reason} onChange={e=>setUngForm(v=>({...v,reason:e.target.value}))}/></label>
       </div><button className="btn primary" disabled={busy} onClick={()=>void saveAdvance()}>XÁC NHẬN CHO ỨNG</button></section>
-      <section className="panel stack"><div className="flex flex-wrap items-center justify-between gap-3"><h2>Danh sách đã ứng</h2><input type="month" className="field max-w-xs" value={ungMonth} onChange={e=>setUngMonth(e.target.value)}/></div>
+      <section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6"><div className="flex flex-wrap items-center justify-between gap-3"><h2>Danh sách đã ứng</h2><input type="month" className="field max-w-xs" value={ungMonth} onChange={e=>setUngMonth(e.target.value)}/></div>
         <div className="az-table-wrap"><table className="az-table"><thead><tr><th>STT</th><th>Ngày</th><th>Nhân viên</th><th>Số tiền</th><th>Lý do</th></tr></thead><tbody>{advancesMonth.map((u,i)=><tr key={u.id}><td>{i+1}</td><td>{dayLabel(u.advance_date)}</td><td><b>{staffMap.get(u.staff_id)?.display_name||"—"}</b></td><td><b>{money(u.amount)}</b></td><td>{u.reason||"—"}</td></tr>)}</tbody></table></div>
       </section>
     </div>}
 
-    {tab==="SUA"&&<section className="panel stack">
+    {tab==="SUA"&&<section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6">
       <div className="flex flex-wrap gap-2"><button className={`btn ${editMode==="GIA"?"primary":"soft"}`} onClick={()=>setEditMode("GIA")}>Đổi Giá</button><button className={`btn ${editMode==="CONG"?"primary":"soft"}`} onClick={()=>setEditMode("CONG")}>Sửa Công</button><button className={`btn ${editMode==="UNG"?"primary":"soft"}`} onClick={()=>setEditMode("UNG")}>Sửa Ứng</button></div>
       {editMode==="GIA"&&<div className="stack"><h2>Cập Nhật Mức Lương Mới</h2><div className="grid gap-3 md:grid-cols-3"><label>Tên Nhân Viên *<select className="field mt-2" value={rateForm.staff_id} onChange={e=>setRateForm(v=>({...v,staff_id:e.target.value}))}><option value="">Chọn nhân viên</option>{staff.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label><label>Ngày Bắt Đầu Áp Dụng *<input type="date" className="field mt-2" value={rateForm.date} onChange={e=>setRateForm(v=>({...v,date:e.target.value}))}/></label><label>Giá Công Mới *<input type="number" className="field mt-2" value={rateForm.rate} onChange={e=>setRateForm(v=>({...v,rate:e.target.value}))}/></label></div><button className="btn primary" onClick={()=>void saveRate()} disabled={busy}>LƯU GIÁ MỚI</button></div>}
       {editMode==="CONG"&&<div className="stack"><h2>Sửa Phiếu Chấm Công Bị Sai</h2><p className="muted">Chỉ nhập ô muốn thay đổi. Ô trống giữ nguyên dữ liệu cũ.</p><div className="grid gap-3 md:grid-cols-2"><label>Tên Nhân Viên *<select className="field mt-2" value={attEdit.staff_id} onChange={e=>setAttEdit(v=>({...v,staff_id:e.target.value}))}><option value="">Chọn nhân viên</option>{staff.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label><label>Tháng / Năm *<input type="month" className="field mt-2" value={attEdit.month} onChange={e=>setAttEdit(v=>({...v,month:e.target.value}))}/></label><label>Số Công (Mới)<input className="field mt-2" value={attEdit.work_days} onChange={e=>setAttEdit(v=>({...v,work_days:e.target.value}))}/></label><label>Tăng Ca (Mới)<input type="number" className="field mt-2" value={attEdit.overtime} onChange={e=>setAttEdit(v=>({...v,overtime:e.target.value}))}/></label><label>Thưởng (Mới)<input type="number" className="field mt-2" value={attEdit.bonus} onChange={e=>setAttEdit(v=>({...v,bonus:e.target.value}))}/></label></div><button className="btn primary" onClick={()=>void updateAttendance()} disabled={busy}>LƯU THAY ĐỔI</button></div>}
       {editMode==="UNG"&&<div className="stack"><h2>Quản Lý & Sửa Phiếu Ứng</h2><div className="az-table-wrap"><table className="az-table"><thead><tr><th>Ngày</th><th>Nhân viên</th><th>Số tiền</th><th>Lý do</th><th>Thao tác</th></tr></thead><tbody>{advances.map(u=><tr key={u.id}><td>{dayLabel(u.advance_date)}</td><td>{staffMap.get(u.staff_id)?.display_name||"—"}</td><td>{money(u.amount)}</td><td>{u.reason||"—"}</td><td><div className="flex gap-2"><button className="btn soft" onClick={()=>{setAdvanceEdit(u);setAdvanceEditAmount(String(u.amount));setAdvanceEditReason(u.reason||"")}}>Sửa</button><button className="btn soft" onClick={()=>void deleteAdvance(u.id)}>Xóa</button></div></td></tr>)}</tbody></table></div></div>}
     </section>}
 
-    {tab==="BAO_CAO"&&<section className="panel stack">
+    {tab==="BAO_CAO"&&<section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6">
       <div className="flex flex-wrap gap-2"><button className={`btn ${reportMode==="CA_NHAN"?"primary":"soft"}`} onClick={()=>{setReportMode("CA_NHAN");setShowReport(false)}}>Cá Nhân</button><button className={`btn ${reportMode==="TONG_QUAT"?"primary":"soft"}`} onClick={()=>{setReportMode("TONG_QUAT");setShowReport(false)}}>Tổng Quát</button></div>
       <div className="grid gap-3 md:grid-cols-3">{reportMode==="CA_NHAN"&&<label>Tên Nhân Viên *<select className="field mt-2" value={reportStaff} onChange={e=>{setReportStaff(e.target.value);setShowReport(false)}}><option value="">Chọn nhân viên</option>{staff.map(s=><option key={s.id} value={s.id}>{s.display_name}</option>)}</select></label>}<label>Từ Tháng *<input type="month" className="field mt-2" value={reportFrom} onChange={e=>{setReportFrom(e.target.value);setShowReport(false)}}/></label><label>Đến Tháng *<input type="month" className="field mt-2" value={reportTo} onChange={e=>{setReportTo(e.target.value);setShowReport(false)}}/></label></div>
       <div className="flex flex-wrap gap-2">
@@ -342,7 +477,7 @@ export default function StaffCenter(){
       })()}
     </section>}
 
-    {tab==="DS"&&<section className="panel stack">
+    {tab==="DS"&&<section className="space-y-5 rounded-[28px] border border-slate-200 bg-white/95 p-5 shadow-[0_16px_42px_rgba(15,23,42,.06)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-3"><h2>Danh sách nhân viên</h2><input className="field max-w-sm" placeholder="Tìm tên / số điện thoại" value={query} onChange={e=>setQuery(e.target.value)}/></div>
       <div className="az-table-wrap"><table className="az-table"><thead><tr><th>STT</th><th>Nhân viên</th><th>SĐT</th><th>Ngày vào</th><th>Giá công</th><th>Lịch sử lương</th><th>Trạng thái</th><th>Tài khoản</th><th>Thao tác</th></tr></thead><tbody>{filtered.map((s,i)=>{const p=s.profile_id?profiles[s.profile_id]:undefined;const history=rates.filter(x=>x.staff_id===s.id).sort((a,b)=>b.effective_date.localeCompare(a.effective_date));return <tr key={s.id}><td>{i+1}</td><td><b>{s.display_name}</b></td><td>{s.phone||"—"}</td><td>{dayLabel(s.join_date)}</td><td><b>{money(s.daily_rate)}</b></td><td><details><summary className="cursor-pointer font-bold">{history.length} mốc</summary><div className="mt-2 space-y-1">{history.map(h=><div key={h.id}>{dayLabel(h.effective_date)} · <b>{money(h.daily_rate)}</b></div>)}</div></details></td><td>{s.status==="DANG_LAM"?"Đang làm":"Đã nghỉ"}</td><td>{p?<b className="text-emerald-600">Đã có tài khoản</b>:<b className="text-red-600">Chưa có tài khoản</b>}</td><td><div className="flex flex-wrap gap-2"><button className="btn soft" onClick={()=>setEditStaff({id:s.id,name:s.display_name,phone:s.phone||"",status:s.status})}>Sửa</button></div></td></tr>})}</tbody></table></div>
     </section>}
@@ -352,5 +487,6 @@ export default function StaffCenter(){
     {showAdd&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="panel stack w-full max-w-xl"><h2>Thêm Nhân Viên Mới</h2><label>Tên nhân viên *<input className="field mt-2" value={staffForm.name} onChange={e=>setStaffForm(v=>({...v,name:e.target.value}))}/></label><label>Số điện thoại<input className="field mt-2" value={staffForm.phone} onChange={e=>setStaffForm(v=>({...v,phone:e.target.value}))}/></label><div className="grid gap-3 sm:grid-cols-2"><label>Ngày Vào *<input type="date" className="field mt-2" value={staffForm.join_date} onChange={e=>setStaffForm(v=>({...v,join_date:e.target.value}))}/></label><label>Giá Công *<input type="number" className="field mt-2" value={staffForm.daily_rate} onChange={e=>setStaffForm(v=>({...v,daily_rate:e.target.value}))}/></label></div><button className="btn primary" onClick={()=>void addStaff()} disabled={busy}>LƯU NHÂN VIÊN</button><button className="btn soft" onClick={()=>setShowAdd(false)}>Hủy</button></div></div>}
     {editStaff&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="panel stack w-full max-w-lg"><h2>Cập Nhật Thông Tin</h2><label>Tên nhân viên<input className="field mt-2 bg-slate-100" value={editStaff.name} readOnly/></label><label>Số điện thoại<input className="field mt-2" value={editStaff.phone} onChange={e=>setEditStaff(v=>v?{...v,phone:e.target.value}:v)}/></label><label>Trạng thái<select className="field mt-2" value={editStaff.status} onChange={e=>setEditStaff(v=>v?{...v,status:e.target.value as EditStaff["status"]}:v)}><option value="DANG_LAM">Đang làm</option><option value="DA_NGHI">Đã nghỉ</option></select></label><button className="btn primary" onClick={()=>void saveStaffEdit()} disabled={busy}>LƯU THAY ĐỔI</button><button className="btn soft" onClick={()=>setEditStaff(null)}>Hủy</button></div></div>}
     {advanceEdit&&<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"><div className="panel stack w-full max-w-lg"><h2>Sửa phiếu ứng</h2><div><b>{staffMap.get(advanceEdit.staff_id)?.display_name}</b> · {dayLabel(advanceEdit.advance_date)}</div><label>Số tiền<input type="number" className="field mt-2" value={advanceEditAmount} onChange={e=>setAdvanceEditAmount(e.target.value)}/></label><label>Lý do<input className="field mt-2" value={advanceEditReason} onChange={e=>setAdvanceEditReason(e.target.value)}/></label><button className="btn primary" onClick={()=>void saveAdvanceEdit()} disabled={busy}>LƯU THAY ĐỔI</button><button className="btn soft" onClick={()=>setAdvanceEdit(null)}>Hủy</button></div></div>}
-  </div>;
+    </div>
+  </main>;
 }

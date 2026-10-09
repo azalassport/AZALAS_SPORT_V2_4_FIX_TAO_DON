@@ -1,11 +1,26 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Search, X } from "lucide-react";
+import {
+  CalendarDays,
+  Eye,
+  ImageIcon,
+  Search,
+  X,
+} from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { createClient } from "@/lib/supabase/client";
-import { norm, dt } from "@/lib/azalas/format";
-import { ImageViewer, Loading, Msg } from "@/components/ui";
+import { norm } from "@/lib/azalas/format";
+import {
+  ImageViewer,
+  Loading,
+  Msg,
+} from "@/components/ui";
 
 type Group = {
   id: number;
@@ -22,36 +37,57 @@ type Img = {
   storage_path: string;
 };
 
-const VN_TIME_ZONE = "Asia/Ho_Chi_Minh";
+type DateSection = {
+  key: string;
+  label: string;
+  groups: Group[];
+};
 
-function getDateKey(value: string) {
-  try {
-    const parts = new Intl.DateTimeFormat("en-CA", {
-      timeZone: VN_TIME_ZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    }).formatToParts(new Date(value));
+function vietnamDateKey(value: string) {
+  const date = new Date(value);
 
-    const year =
-      parts.find((part) => part.type === "year")?.value || "";
-    const month =
-      parts.find((part) => part.type === "month")?.value || "";
-    const day =
-      parts.find((part) => part.type === "day")?.value || "";
-
-    return `${year}-${month}-${day}`;
-  } catch {
+  if (Number.isNaN(date.getTime())) {
     return "";
   }
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
 }
 
-function displayDateFromKey(key: string) {
-  const [year, month, day] = key.split("-");
+function vietnamDateLabel(value: string) {
+  const date = new Date(value);
 
-  if (!year || !month || !day) return key;
+  if (Number.isNaN(date.getTime())) {
+    return "Không rõ ngày";
+  }
 
-  return `${Number(day)}/${Number(month)}/${year}`;
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+function vietnamDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "—";
+  }
+
+  return new Intl.DateTimeFormat("vi-VN", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
 }
 
 export default function ImagesLibrary() {
@@ -60,10 +96,8 @@ export default function ImagesLibrary() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [images, setImages] = useState<Img[]>([]);
   const [urls, setUrls] = useState<Record<number, string>>({});
-
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState("");
-
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
@@ -71,397 +105,338 @@ export default function ImagesLibrary() {
     setLoading(true);
     setErr("");
 
-    const { data: g, error: e } = await sb
-      .from("order_groups")
-      .select(
-        "id,root_code,customer_name,order_type,created_at,creator_note",
-      )
-      .order("created_at", { ascending: false })
-      .limit(120);
+    try {
+      const { data: groupData, error: groupError } = await sb
+        .from("order_groups")
+        .select(
+          "id,root_code,customer_name,order_type,created_at,creator_note",
+        )
+        .order("created_at", { ascending: false })
+        .limit(300);
 
-    if (e) {
-      setErr(e.message);
-      setLoading(false);
-      return;
-    }
-
-    const ids = (g || []).map((x) => x.id);
-
-    const { data: imgs, error: ie } = ids.length
-      ? await sb
-          .from("order_images")
-          .select("id,group_id,storage_path")
-          .in("group_id", ids)
-          .order("id")
-      : {
-          data: [] as Img[],
-          error: null,
-        };
-
-    if (ie) {
-      setErr(ie.message);
-    }
-
-    setGroups(
-      (g || []).filter((group) =>
-        (imgs || []).some(
-          (image) => image.group_id === group.id,
-        ),
-      ) as Group[],
-    );
-
-    setImages((imgs || []) as Img[]);
-
-    const paths = (imgs || []).map(
-      (image) => image.storage_path,
-    );
-
-    if (paths.length) {
-      const { data: signed, error: se } =
-        await sb.storage
-          .from("az-order-images")
-          .createSignedUrls(paths, 3600);
-
-      if (se) {
-        setErr(se.message);
-      } else {
-        setUrls(
-          Object.fromEntries(
-            (imgs || []).map((img, index) => [
-              img.id,
-              signed?.[index]?.signedUrl || "",
-            ]),
-          ),
-        );
+      if (groupError) {
+        setErr(groupError.message);
+        return;
       }
-    } else {
-      setUrls({});
-    }
 
-    setLoading(false);
+      const rawGroups = (groupData || []) as Group[];
+      const ids = rawGroups.map((group) => group.id);
+
+      const imageResult = ids.length
+        ? await sb
+            .from("order_images")
+            .select("id,group_id,storage_path")
+            .in("group_id", ids)
+            .order("id")
+        : {
+            data: [] as Img[],
+            error: null,
+          };
+
+      if (imageResult.error) {
+        setErr(imageResult.error.message);
+        return;
+      }
+
+      const rawImages = (imageResult.data || []) as Img[];
+      const imageGroupIds = new Set(
+        rawImages.map((image) => image.group_id),
+      );
+
+      setGroups(
+        rawGroups.filter((group) => imageGroupIds.has(group.id)),
+      );
+      setImages(rawImages);
+
+      const paths = rawImages.map((image) => image.storage_path);
+
+      if (!paths.length) {
+        setUrls({});
+        return;
+      }
+
+      const { data: signed, error: signedError } = await sb.storage
+        .from("az-order-images")
+        .createSignedUrls(paths, 3600);
+
+      if (signedError) {
+        setErr(signedError.message);
+        return;
+      }
+
+      setUrls(
+        Object.fromEntries(
+          rawImages.map((image, index) => [
+            image.id,
+            signed?.[index]?.signedUrl || "",
+          ]),
+        ),
+      );
+    } finally {
+      setLoading(false);
+    }
   }, [sb]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  // SEARCH + LỌC NGÀY
-  const filteredGroups = useMemo(() => {
-    const keyword = norm(search);
+  const filtered = useMemo(() => {
+    const keyword = norm(search.trim());
 
     return groups.filter((group) => {
-      const matchesSearch = norm(
-        `${group.root_code} ${group.customer_name} ${
-          group.creator_note || ""
-        }`,
-      ).includes(keyword);
+      const matchesSearch =
+        !keyword ||
+        norm(
+          [
+            group.root_code,
+            group.customer_name,
+            group.creator_note || "",
+          ].join(" "),
+        ).includes(keyword);
 
       const matchesDate =
         !selectedDate ||
-        getDateKey(group.created_at) === selectedDate;
+        vietnamDateKey(group.created_at) === selectedDate;
 
       return matchesSearch && matchesDate;
     });
   }, [groups, search, selectedDate]);
 
-  // GOM TẤT CẢ ĐƠN THEO NGÀY
-  const groupsByDate = useMemo(() => {
-    const map = new Map<string, Group[]>();
+  const sections = useMemo<DateSection[]>(() => {
+    const map = new Map<string, DateSection>();
 
-    filteredGroups.forEach((group) => {
-      const key = getDateKey(group.created_at);
+    for (const group of filtered) {
+      const key =
+        vietnamDateKey(group.created_at) || "unknown";
 
       if (!map.has(key)) {
-        map.set(key, []);
+        map.set(key, {
+          key,
+          label:
+            key === "unknown"
+              ? "Không rõ ngày"
+              : vietnamDateLabel(group.created_at),
+          groups: [],
+        });
       }
 
-      map.get(key)!.push(group);
-    });
+      map.get(key)!.groups.push(group);
+    }
 
-    return [...map.entries()].sort(
-      ([dateA], [dateB]) =>
-        dateB.localeCompare(dateA),
-    );
-  }, [filteredGroups]);
+    return Array.from(map.values());
+  }, [filtered]);
+
+  const totalImages = useMemo(
+    () =>
+      filtered.reduce(
+        (sum, group) =>
+          sum +
+          images.filter(
+            (image) => image.group_id === group.id,
+          ).length,
+        0,
+      ),
+    [filtered, images],
+  );
 
   return (
-    <div className="space-y-7">
+    <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white/95 shadow-[0_18px_48px_rgba(15,23,42,.07)]">
+      <div className="border-b border-slate-100 bg-gradient-to-br from-white via-blue-50/40 to-cyan-50/50 p-4 sm:p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <div className="text-[11px] font-black uppercase tracking-[0.17em] text-blue-700">
+              KHO ẢNH
+            </div>
 
-      {/* SEARCH + CHỌN NGÀY */}
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_280px]">
+            <h2 className="mt-1 text-[25px] font-black tracking-[-0.5px] text-[#0d2346] sm:text-[31px]">
+              Ảnh đơn khách đặt
+            </h2>
 
-        {/* SEARCH */}
-        <div className="relative">
-          <Search
-            size={21}
-            strokeWidth={2}
-            className="
-              pointer-events-none
-              absolute
-              left-4
-              top-1/2
-              -translate-y-1/2
-              text-slate-400
-            "
-          />
-
-          <input
-            className="
-              field
-              !h-[56px]
-              !rounded-2xl
-              !border-blue-200
-              !bg-white
-              !pl-12
-              !text-[16px]
-              shadow-[0_7px_22px_rgba(37,99,235,0.06)]
-            "
-            placeholder="Tìm tên khách, mã đơn hoặc ghi chú..."
-            value={search}
-            onChange={(e) =>
-              setSearch(e.target.value)
-            }
-          />
-        </div>
-
-        {/* CHỌN NGÀY */}
-        <div className="flex gap-2">
-          <div className="relative min-w-0 flex-1">
-
-            <CalendarDays
-              size={21}
-              strokeWidth={2}
-              className="
-                pointer-events-none
-                absolute
-                left-4
-                top-1/2
-                z-10
-                -translate-y-1/2
-                text-blue-600
-              "
-            />
-
-            <input
-              type="date"
-              className="
-                field
-                !h-[56px]
-                !rounded-2xl
-                !border-blue-200
-                !bg-white
-                !pl-12
-                !text-[15px]
-                !font-bold
-                text-slate-800
-                shadow-[0_7px_22px_rgba(37,99,235,0.06)]
-              "
-              value={selectedDate}
-              onChange={(e) =>
-                setSelectedDate(e.target.value)
-              }
-            />
+            <p className="mt-2 text-[13px] font-semibold text-slate-500 sm:text-[14px]">
+              Ảnh được nhóm theo ngày, mới nhất hiển thị trước.
+            </p>
           </div>
 
-          {selectedDate && (
+          <div className="flex gap-3">
+            <div className="rounded-2xl border border-blue-200 bg-white px-4 py-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
+                Đơn có ảnh
+              </div>
+              <div className="mt-1 text-[24px] font-black text-blue-700">
+                {filtered.length}
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-cyan-200 bg-white px-4 py-3">
+              <div className="text-[10px] font-black uppercase tracking-[0.1em] text-slate-400">
+                Tổng ảnh
+              </div>
+              <div className="mt-1 text-[24px] font-black text-cyan-700">
+                {totalImages}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_260px]">
+          <label className="relative block">
+            <Search
+              className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400"
+              strokeWidth={2.3}
+            />
+            <input
+              value={search}
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Tìm tên khách, mã đơn hoặc ghi chú..."
+              className="h-14 w-full rounded-2xl border border-slate-200 bg-white pl-12 pr-11 text-[15px] font-semibold text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-blue-300 focus:ring-4 focus:ring-blue-100/70"
+            />
+
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                aria-label="Xóa tìm kiếm"
+                className="absolute right-3 top-1/2 grid h-8 w-8 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </label>
+
+          <label className="relative block">
+            <CalendarDays
+              className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-blue-600"
+              strokeWidth={2.2}
+            />
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(event) =>
+                setSelectedDate(event.target.value)
+              }
+              className="h-14 w-full rounded-2xl border border-blue-200 bg-white pl-12 pr-4 text-[15px] font-black text-slate-700 outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100/70"
+            />
+          </label>
+        </div>
+
+        {(search || selectedDate) && (
+          <div className="mt-3 flex justify-end">
             <button
               type="button"
-              onClick={() =>
-                setSelectedDate("")
-              }
-              title="Hiện tất cả ngày"
-              className="
-                flex
-                h-[56px]
-                w-[56px]
-                shrink-0
-                items-center
-                justify-center
-                rounded-2xl
-                border
-                border-slate-200
-                bg-white
-                text-slate-500
-                shadow-sm
-                transition
-                hover:border-blue-200
-                hover:bg-blue-50
-                hover:text-blue-700
-              "
+              onClick={() => {
+                setSearch("");
+                setSelectedDate("");
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-black text-slate-500 transition hover:bg-slate-50"
             >
-              <X size={20} />
+              <X className="h-4 w-4" />
+              Xóa bộ lọc
             </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
-      <Msg error={err} />
+      <div className="p-4 sm:p-6">
+        <Msg error={err} />
 
-      {loading ? (
-        <Loading />
-      ) : filteredGroups.length === 0 ? (
-        <div className="panel muted">
-          Chưa có ảnh đơn phù hợp.
-          Đơn vừa tạo mà thiếu ảnh cần được
-          upload bổ sung trước.
-        </div>
-      ) : (
-        <div className="space-y-10">
+        {loading ? (
+          <Loading />
+        ) : sections.length === 0 ? (
+          <div className="rounded-[24px] border border-dashed border-blue-200 bg-blue-50/40 px-6 py-12 text-center">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-white text-blue-500 shadow-sm">
+              <ImageIcon className="h-8 w-8" strokeWidth={2} />
+            </div>
 
-          {groupsByDate.map(
-            ([date, dayGroups]) => (
-              <section
-                key={date}
-                className="space-y-5"
-              >
+            <div className="mt-4 text-[18px] font-black text-[#0d2346]">
+              Chưa có ảnh đơn phù hợp
+            </div>
 
-                {/* NGÀY CĂN GIỮA */}
-                <div className="
-                  flex
-                  items-center
-                  gap-4
-                ">
-                  <div className="
-                    h-px
-                    flex-1
-                    bg-gradient-to-r
-                    from-transparent
-                    via-blue-200
-                    to-blue-300
-                  " />
+            <p className="mx-auto mt-2 max-w-[560px] text-[14px] font-semibold leading-6 text-slate-500">
+              Đơn vừa tạo mà thiếu ảnh cần được upload bổ sung trước.
+              Bạn cũng có thể thay đổi từ khóa hoặc ngày để tìm lại.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {sections.map((section) => (
+              <div key={section.key}>
+                <div className="mb-4 flex items-center gap-4">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent to-blue-200" />
 
-                  <div className="
-                    min-w-[175px]
-                    rounded-full
-                    border
-                    border-blue-200
-                    bg-white
-                    px-6
-                    py-2.5
-                    text-center
-                    text-[19px]
-                    font-black
-                    tracking-[0.01em]
-                    text-blue-950
-                    shadow-sm
-                  ">
-                    {displayDateFromKey(date)}
+                  <div className="rounded-full border border-blue-200 bg-blue-50 px-5 py-2 text-[13px] font-black tracking-[0.05em] text-blue-700 shadow-sm sm:text-[14px]">
+                    {section.label}
                   </div>
 
-                  <div className="
-                    h-px
-                    flex-1
-                    bg-gradient-to-l
-                    from-transparent
-                    via-blue-200
-                    to-blue-300
-                  " />
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent to-blue-200" />
                 </div>
 
-                {/* TOÀN BỘ ẢNH CỦA NGÀY */}
-                <div className="
-                  grid
-                  gap-5
-                  lg:grid-cols-2
-                ">
-                  {dayGroups.map((g) => {
-
-                    const groupImages =
-                      images
-                        .filter(
-                          (image) =>
-                            image.group_id ===
-                            g.id,
-                        )
-                        .map(
-                          (image) =>
-                            urls[image.id],
-                        )
-                        .filter(Boolean);
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {section.groups.map((group) => {
+                    const groupImages = images
+                      .filter(
+                        (image) =>
+                          image.group_id === group.id,
+                      )
+                      .map((image) => urls[image.id])
+                      .filter(Boolean);
 
                     return (
-                      <section
-                        key={g.id}
-                        className="
-                          rounded-[22px]
-                          border
-                          border-slate-200
-                          bg-white
-                          p-5
-                          shadow-[0_10px_30px_rgba(30,64,175,0.07)]
-                          sm:p-6
-                        "
+                      <article
+                        key={group.id}
+                        className="overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-[0_12px_30px_rgba(15,23,42,.06)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(15,23,42,.09)]"
                       >
-                        <div className="
-                          flex
-                          items-start
-                          justify-between
-                          gap-4
-                        ">
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-blue-50/40 p-4 sm:p-5">
                           <div className="min-w-0">
+                            <div className="truncate text-[19px] font-black text-[#0d2346] sm:text-[21px]">
+                              {group.customer_name}
+                            </div>
 
-                            <h2 className="
-                              text-[21px]
-                              font-black
-                              text-slate-950
-                            ">
-                              {g.customer_name}
-                            </h2>
-
-                            <p className="
-                              mt-1
-                              text-[14px]
-                              font-medium
-                              text-slate-500
-                            ">
-                              {g.root_code}
-                              {" · "}
-                              {dt(g.created_at)}
-                            </p>
-
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-bold text-slate-500 sm:text-[13px]">
+                              <span className="rounded-lg bg-blue-50 px-2 py-1 text-blue-700">
+                                {group.root_code}
+                              </span>
+                              <span>
+                                {vietnamDateTime(
+                                  group.created_at,
+                                )}
+                              </span>
+                              <span>· {groupImages.length} ảnh</span>
+                            </div>
                           </div>
 
                           <Link
-                            className="
-                              btn
-                              soft
-                              shrink-0
-                            "
                             href="/azalas/orders"
+                            className="inline-flex min-h-[40px] shrink-0 items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 text-[12px] font-black text-blue-700 transition hover:bg-blue-100 sm:text-[13px]"
                           >
-                            Xem đơn →
+                            <Eye className="h-4 w-4" />
+                            Xem đơn
                           </Link>
                         </div>
 
-                        {g.creator_note && (
-                          <p className="
-                            mt-2
-                            text-[15px]
-                            text-slate-600
-                          ">
-                            {g.creator_note}
-                          </p>
+                        {group.creator_note && (
+                          <div className="mx-4 mt-4 rounded-xl border border-amber-100 bg-amber-50/60 px-3 py-2 text-[13px] font-semibold leading-5 text-slate-600 sm:mx-5">
+                            {group.creator_note}
+                          </div>
                         )}
 
-                        <div className="mt-4">
+                        <div className="p-4 sm:p-5">
                           <ImageViewer
-                            urls={
-                              groupImages
-                            }
-                            label={
-                              `Ảnh đơn ${g.root_code}`
-                            }
+                            urls={groupImages}
+                            label={`Ảnh đơn ${group.root_code}`}
                           />
                         </div>
-                      </section>
+                      </article>
                     );
                   })}
                 </div>
-              </section>
-            ),
-          )}
-        </div>
-      )}
-    </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
