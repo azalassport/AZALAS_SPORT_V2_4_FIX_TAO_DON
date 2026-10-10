@@ -141,7 +141,7 @@ export default function PatternCustomerEntry() {
 
   return <div className="stack">
     <Msg error={error} success={ok}/>
-    <section className="panel stack">
+    <section className="space-y-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,.05)] sm:p-6">
       <h2 className="text-xl font-extrabold text-violet-900">Rập Khách đặt</h2>
       <div className="rounded-xl border border-violet-200 bg-violet-50 p-3 text-sm font-semibold text-violet-950">
         Rập Khách đặt không cần chọn mã đơn. Chọn khách hàng trực tiếp; số lượng được khai độc lập theo thực tế: 100x7=700 hoặc x=700. Tỉ lệ size có thể để trống và không tự thay đổi số lượng.

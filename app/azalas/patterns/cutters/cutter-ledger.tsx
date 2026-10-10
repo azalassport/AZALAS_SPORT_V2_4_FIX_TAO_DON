@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loading, Msg } from "@/components/ui";
 import { dt, errorText } from "@/lib/azalas/format";
+import { CheckCircle2, RefreshCw, WalletCards } from "lucide-react";
 
 type Cutter = { id: number; name: string };
 type Job = {
@@ -477,19 +478,23 @@ export function CutterLedger() {
   return <div className="stack">
     <Msg error={error} success={ok} />
 
-    <div className="panel stack">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-extrabold text-slate-900">THỢ CẮT</h1>
-          <p className="mt-1 text-sm text-slate-600">Chốt tiền công và công nợ theo tháng. Ứng tháng nào chỉ trừ đúng tháng đó.</p>
-        </div>
-        <button className="btn soft" onClick={() => void reload()} disabled={busy || loading}>Tải lại số liệu</button>
+    <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,.05)] sm:p-5">
+      <div className="mb-4 flex justify-end">
+        <button className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-[12px] font-black text-slate-600 transition hover:bg-slate-100" onClick={() => void reload()} disabled={busy || loading}><RefreshCw className="h-4 w-4" /> Tải lại số liệu</button>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <button className={`btn ${tab === "CHOT" ? "primary" : ""}`} onClick={() => setTab("CHOT")}>✓ CHỐT TT</button>
-        <button className={`btn ${tab === "DEBT" ? "primary" : ""}`} onClick={() => setTab("DEBT")}>▣ CÔNG NỢ & THANH TOÁN</button>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button type="button" onClick={() => setTab("CHOT")}
+          className={`flex min-h-[92px] items-center gap-4 rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,.07)] ${tab === "CHOT" ? "border-rose-300 bg-rose-50 text-rose-800 shadow-[0_10px_24px_rgba(244,63,94,.10)]" : "border-slate-200 bg-white text-slate-700"}`}>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${tab === "CHOT" ? "bg-rose-100 text-rose-600" : "bg-slate-100 text-slate-500"}`}><CheckCircle2 className="h-6 w-6" /></span>
+          <span><span className="block text-[16px] font-black">Chốt TT</span><span className="mt-1 block text-[12px] font-semibold opacity-70">Chốt tiền công theo tháng</span></span>
+        </button>
+        <button type="button" onClick={() => setTab("DEBT")}
+          className={`flex min-h-[92px] items-center gap-4 rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,.07)] ${tab === "DEBT" ? "border-blue-300 bg-blue-50 text-blue-800 shadow-[0_10px_24px_rgba(37,99,235,.10)]" : "border-slate-200 bg-white text-slate-700"}`}>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${tab === "DEBT" ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-500"}`}><WalletCards className="h-6 w-6" /></span>
+          <span><span className="block text-[16px] font-black">Công nợ & Thanh toán</span><span className="mt-1 block text-[12px] font-semibold opacity-70">Ứng trước, thanh toán, lịch sử</span></span>
+        </button>
       </div>
-    </div>
+    </section>
 
     {tab === "CHOT" && <section className="panel stack">
       <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -629,7 +634,7 @@ export function CutterLedger() {
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-2xl border bg-white p-4 shadow-sm"><div className="text-sm text-slate-600">{label}</div><div className="mt-2 text-2xl font-extrabold text-slate-900">{value}</div></div>;
+  return <div className="rounded-[20px] border border-slate-200 bg-gradient-to-br from-white to-slate-50 p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]"><div className="text-[11px] font-black uppercase tracking-[.06em] text-slate-500">{label}</div><div className="mt-2 text-[24px] font-black text-[#0d2346]">{value}</div></div>;
 }
 
 function MonthCard({ group, profiles, onPay, onAdvance, done = false }: {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Loading, Msg } from "@/components/ui";
 import { dt, errorText } from "@/lib/azalas/format";
+import { CheckCircle2, Factory, WalletCards } from "lucide-react";
 
 type House = { id: number; name: string };
 
@@ -769,24 +770,22 @@ export function HouseLedger() {
     <div className="stack">
       <Msg error={error} success={ok} />
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        <button
-          className={`btn ${tab === "CHOT" ? "primary" : ""}`}
-          onClick={() => setTab("CHOT")}
-        >
-          ✓ CHỐT TT
+      <div className="grid gap-3 sm:grid-cols-2">
+        <button type="button" onClick={() => setTab("CHOT")}
+          className={`flex min-h-[92px] items-center gap-4 rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,.07)] ${tab === "CHOT" ? "border-violet-300 bg-violet-50 text-violet-800 shadow-[0_10px_24px_rgba(124,58,237,.10)]" : "border-slate-200 bg-white text-slate-700"}`}>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${tab === "CHOT" ? "bg-violet-100 text-violet-600" : "bg-slate-100 text-slate-500"}`}><CheckCircle2 className="h-6 w-6" /></span>
+          <span><span className="block text-[16px] font-black">Chốt TT</span><span className="mt-1 block text-[12px] font-semibold opacity-70">Bảng kê mâm chờ chốt</span></span>
         </button>
-        <button
-          className={`btn ${tab === "DEBT" ? "primary" : ""}`}
-          onClick={() => setTab("DEBT")}
-        >
-          ▣ CÔNG NỢ & THANH TOÁN
+        <button type="button" onClick={() => setTab("DEBT")}
+          className={`flex min-h-[92px] items-center gap-4 rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(15,23,42,.07)] ${tab === "DEBT" ? "border-blue-300 bg-blue-50 text-blue-800 shadow-[0_10px_24px_rgba(37,99,235,.10)]" : "border-slate-200 bg-white text-slate-700"}`}>
+          <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-2xl ${tab === "DEBT" ? "bg-blue-100 text-blue-600" : "bg-slate-100 text-slate-500"}`}><WalletCards className="h-6 w-6" /></span>
+          <span><span className="block text-[16px] font-black">Công nợ & Thanh toán</span><span className="mt-1 block text-[12px] font-semibold opacity-70">Ứng trước, thanh toán, lịch sử</span></span>
         </button>
       </div>
 
-      <section className="panel">
+      <section className="rounded-[24px] border border-violet-100 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,.05)]">
         <label className={label}>
-          CHỌN NHÀ MAY *
+          <span className="mb-2 flex items-center gap-2 text-[12px] font-black uppercase tracking-[.07em] text-violet-700"><Factory className="h-4 w-4" /> Chọn nhà may *</span>
           <select
             className={field}
             value={houseId}
@@ -837,19 +836,19 @@ export function HouseLedger() {
       {!loading && manager && houseId && tab === "CHOT" && (
         <>
           <div className="grid gap-3 md:grid-cols-4">
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Mâm mới đủ chốt</span>
               <strong>{eligibleMams.length} mâm</strong>
             </div>
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Hàng vét chờ tính</span>
               <strong>{vetMams.length} mâm · {n(sum(vetMams.map(m => m.vetWaiting)))} cái</strong>
             </div>
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Đã chọn</span>
               <strong>{selectedAllCount} dòng</strong>
             </div>
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Tiền đang chọn</span>
               <strong>{cash(selectedAllAmount)}</strong>
             </div>
@@ -1069,15 +1068,15 @@ export function HouseLedger() {
       {!loading && manager && houseId && tab === "DEBT" && (
         <>
           <div className="grid gap-3 md:grid-cols-3">
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Còn nợ các bảng kê</span>
               <strong>{cash(grossDue)}</strong>
             </div>
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Ứng trước chưa phân bổ</span>
               <strong>{cash(credit)}</strong>
             </div>
-            <div className="kpi">
+            <div className="rounded-[20px] border border-slate-200 bg-white p-4 shadow-[0_8px_22px_rgba(15,23,42,.045)]">
               <span>Số dư ròng (nợ − ứng)</span>
               <strong>
                 {cash((toCents(grossDue) - toCents(credit)) / 100)}

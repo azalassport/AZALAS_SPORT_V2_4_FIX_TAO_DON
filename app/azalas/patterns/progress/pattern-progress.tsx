@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { ImageViewer, Loading, Msg, Tabs } from "@/components/ui";
+import { ImageViewer, Loading, Msg } from "@/components/ui";
+import { Boxes, CheckCircle2, Clock3, Factory, Search, Sparkles, WalletCards } from "lucide-react";
 import { day, dt, norm } from "@/lib/azalas/format";
 
 type Job = {
@@ -425,26 +426,71 @@ export default function PatternProgress() {
     } finally { setBusy(false); }
   }
 
-  return <div className="stack">
+  const stageUi: Record<Stage, { title: string; desc: string; cls: string; iconCls: string }> = {
+    ALL: { title: "Tất cả", desc: "Toàn bộ mâm", cls: "border-blue-300 bg-blue-50 text-blue-800", iconCls: "bg-blue-100 text-blue-600" },
+    OPEN: { title: "Đang cắt / Chưa đủ", desc: "Còn thiếu hàng", cls: "border-amber-300 bg-amber-50 text-amber-800", iconCls: "bg-amber-100 text-amber-600" },
+    READY: { title: "Đủ / Chờ TT", desc: "Đã giao đủ hoặc ép chốt", cls: "border-emerald-300 bg-emerald-50 text-emerald-800", iconCls: "bg-emerald-100 text-emerald-600" },
+    VET: { title: "Còn hàng vét", desc: "Đã chốt, còn vét", cls: "border-orange-300 bg-orange-50 text-orange-800", iconCls: "bg-orange-100 text-orange-600" },
+    PAID: { title: "Đã xong & Đã TT", desc: "Hoàn tất", cls: "border-violet-300 bg-violet-50 text-violet-800", iconCls: "bg-violet-100 text-violet-600" },
+  };
+
+  const stageIcon = (value: Stage) => value === "ALL" ? Boxes : value === "OPEN" ? Clock3 : value === "READY" ? CheckCircle2 : value === "VET" ? Sparkles : WalletCards;
+
+  return <div className="space-y-5">
     <Msg error={error} success={ok} />
+
     <div className="grid gap-3 md:grid-cols-2">
-      <div className="kpi"><span className="muted text-sm">Số lượng HÀNG NHÀ {houseFilter !== "ALL" ? `· ${houseFilter}` : "· tất cả nhà may"}</span>
-        <strong>{num(houseQty("THUONG"))} chiếc</strong><span className="text-xs text-slate-600">Kế hoạch · {houseJobs.filter(j => j.order_type === "THUONG").length} mẫu</span></div>
-      <div className="kpi"><span className="muted text-sm">Số lượng HÀNG KHÁCH ĐẶT {houseFilter !== "ALL" ? `· ${houseFilter}` : "· tất cả nhà may"}</span>
-        <strong>{num(houseQty("KHACH_DAT"))} chiếc</strong><span className="text-xs text-slate-600">Kế hoạch · {houseJobs.filter(j => j.order_type === "KHACH_DAT").length} mẫu</span></div>
+      <div className="rounded-[24px] border border-blue-100 bg-[linear-gradient(135deg,#ffffff,#eff6ff)] p-5 shadow-[0_12px_28px_rgba(37,99,235,.06)]">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-blue-100 text-blue-600"><Boxes className="h-5 w-5" /></span>
+          <div><p className="text-[11px] font-black uppercase tracking-[.08em] text-blue-600">Hàng nhà</p><p className="mt-1 text-[13px] font-semibold text-slate-500">{houseFilter !== "ALL" ? houseFilter : "Tất cả nhà may"}</p></div>
+        </div>
+        <div className="mt-4 text-[30px] font-black tracking-[-.6px] text-[#0d2346]">{num(houseQty("THUONG"))} <span className="text-[16px] text-slate-500">chiếc</span></div>
+        <p className="mt-1 text-[12px] font-semibold text-slate-500">Kế hoạch · {houseJobs.filter(j => j.order_type === "THUONG").length} mẫu</p>
+      </div>
+
+      <div className="rounded-[24px] border border-orange-100 bg-[linear-gradient(135deg,#ffffff,#fff7ed)] p-5 shadow-[0_12px_28px_rgba(249,115,22,.06)]">
+        <div className="flex items-center gap-3">
+          <span className="grid h-11 w-11 place-items-center rounded-2xl bg-orange-100 text-orange-600"><Factory className="h-5 w-5" /></span>
+          <div><p className="text-[11px] font-black uppercase tracking-[.08em] text-orange-600">Hàng khách đặt</p><p className="mt-1 text-[13px] font-semibold text-slate-500">{houseFilter !== "ALL" ? houseFilter : "Tất cả nhà may"}</p></div>
+        </div>
+        <div className="mt-4 text-[30px] font-black tracking-[-.6px] text-[#0d2346]">{num(houseQty("KHACH_DAT"))} <span className="text-[16px] text-slate-500">chiếc</span></div>
+        <p className="mt-1 text-[12px] font-semibold text-slate-500">Kế hoạch · {houseJobs.filter(j => j.order_type === "KHACH_DAT").length} mẫu</p>
+      </div>
     </div>
-    <div className="grid gap-2 sm:grid-cols-2">
-      <select className={field} value={houseFilter} onChange={e => { setHouseFilter(e.target.value); setShowAll(false); }}>
-        <option value="ALL">Tất cả nhà may</option>
-        {houseNames.map(name => <option value={name} key={name}>{name}</option>)}
-      </select>
-      <input className={field} value={search} onChange={e => setSearch(e.target.value)}
-        placeholder="Tìm MAM / PNR / mã rập / sản phẩm / hiệu / khách..." />
-    </div>
-    {manager && <Tabs value={stage} onChange={value => { setStage(value as Stage); setShowAll(false); }}
-      items={(["ALL", "OPEN", "READY", "VET", "PAID"] as Stage[]).map(value => ({ value,
-        label: stageText[value], count: value === "ALL" ? byHouse.length :
-          byHouse.filter(mam => mamStage(mam) === value).length }))} />}
+
+    <section className="rounded-[24px] border border-slate-200 bg-white p-4 shadow-[0_10px_28px_rgba(15,23,42,.05)] sm:p-5">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="block">
+          <span className="mb-2 block text-[12px] font-black uppercase tracking-[.07em] text-slate-500">Nhà may</span>
+          <select className={field} value={houseFilter} onChange={e => { setHouseFilter(e.target.value); setShowAll(false); }}>
+            <option value="ALL">Tất cả nhà may</option>
+            {houseNames.map(name => <option value={name} key={name}>{name}</option>)}
+          </select>
+        </label>
+        <label className="block">
+          <span className="mb-2 block text-[12px] font-black uppercase tracking-[.07em] text-slate-500">Tìm kiếm</span>
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input className={`${field} pl-9`} value={search} onChange={e => setSearch(e.target.value)} placeholder="MAM / PNR / mã rập / sản phẩm / hiệu / khách..." />
+          </div>
+        </label>
+      </div>
+    </section>
+
+    {manager && <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      {(["ALL", "OPEN", "READY", "VET", "PAID"] as Stage[]).map(value => {
+        const I = stageIcon(value);
+        const count = value === "ALL" ? byHouse.length : byHouse.filter(mam => mamStage(mam) === value).length;
+        const active = stage === value;
+        return <button key={value} type="button" onClick={() => { setStage(value); setShowAll(false); }}
+          className={`flex min-h-[92px] items-center gap-3 rounded-[21px] border p-3.5 text-left transition hover:-translate-y-0.5 hover:shadow-[0_10px_24px_rgba(15,23,42,.07)] ${active ? stageUi[value].cls : "border-slate-200 bg-white text-slate-700"}`}>
+          <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${active ? stageUi[value].iconCls : "bg-slate-100 text-slate-500"}`}><I className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-[12px] font-black leading-4">{stageUi[value].title}</span><span className="mt-1 block text-[10px] font-semibold leading-4 opacity-70">{stageUi[value].desc}</span></span>
+          <span className="grid h-8 min-w-8 place-items-center rounded-full bg-white/80 px-2 text-[12px] font-black shadow-sm">{count}</span>
+        </button>;
+      })}
+    </div>}
     {loading && <Loading />}
     {!loading && <div className="stack">
       {visible.map(mam => {
@@ -472,7 +518,7 @@ export default function PatternProgress() {
         const history = receipts.filter(r => mam.jobs.some(j => j.id === r.job_id));
         const notes = events.filter(e => mam.jobs.some(j => j.id === e.job_id) &&
           ["SUA_TT_MAM", "EP_CHOT", "XOA_MAM", "XAC_NHAN_DA_TT", "NHAN_HANG_VET_MAM", "CHOT_TIEN_VET"].includes(e.action));
-        return <article className="panel stack" key={mam.key}>
+        return <article className="space-y-4 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,.055)] sm:p-6" key={mam.key}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div><p className="text-xl font-black text-blue-800">{codes} <span className="text-slate-800">({productNames}{brands ? ` ${brands}` : ""})</span></p>
               <p className="mt-1 text-sm font-bold text-slate-600">Mâm: {code}{mam.slip ? ` · Phiếu ${mam.slip.slip_code}` : ""} · {mam.jobs.length} mẫu/hiệu</p></div>

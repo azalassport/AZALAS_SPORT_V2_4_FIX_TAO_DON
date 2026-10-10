@@ -235,7 +235,7 @@ export default function PatternHouseEntry() {
   const priceFieldError = sewingPriceTouched ? rapSewingPriceError(form.sewingPrice) : "";
   return <div className="stack">
     <Msg success={ok} />
-    <section className="panel stack">
+    <section className="space-y-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,.05)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><h2 className="text-xl font-extrabold text-blue-900">Phiếu nhập rập · Hàng nhà</h2>
           <p className="text-sm text-slate-600">Một phiếu PNR, một mã rập chung, một mã MAM; nhiều hiệu, màu và size.</p></div>
@@ -303,7 +303,7 @@ export default function PatternHouseEntry() {
       </div>}
     </section>
 
-    <section className="panel stack">
+    <section className="space-y-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,.05)] sm:p-6">
       <h2 className="text-lg font-extrabold text-blue-900">Kiểu nhập màu và tỷ lệ size</h2>
       <div className="grid gap-3 md:grid-cols-2">
         <label className={`cursor-pointer rounded-xl border-2 p-4 ${mode === "common" ? "border-blue-600 bg-blue-50" : "border-slate-200"}`}>
@@ -347,7 +347,7 @@ export default function PatternHouseEntry() {
       </div>}
     </section>
 
-    <section className="panel stack">
+    <section className="space-y-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,.05)] sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-lg font-extrabold text-blue-900">Mẫu / hiệu trong phiếu</h2>
         <button className="btn soft" onClick={() => { invalidate(); setModels(old => [...old, newModel()]); }}>+ Thêm mẫu/hiệu</button></div>
       {models.map((model, ix) => {
@@ -403,7 +403,7 @@ export default function PatternHouseEntry() {
       </div>
     </section>
 
-    <section className="panel stack">
+    <section className="space-y-5 rounded-[26px] border border-slate-200 bg-white p-5 shadow-[0_12px_30px_rgba(15,23,42,.05)] sm:p-6">
       <Msg error={error} />
       <button className="btn primary w-fit" disabled={busy} onClick={openPreview}>1 · Xem trước phiếu</button>
       {showPreview && plan.value && <>
