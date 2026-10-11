@@ -33,6 +33,7 @@ type Unit = {
   order_code: string;
   status: string;
   started_by_name: string | null;
+  started_by: string | null;
   deferred_by_name: string | null;
   created_at: string;
 };
@@ -159,6 +160,7 @@ export default function OrdersBoard() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   const [role, setRole] = useState("");
+  const [currentUserId, setCurrentUserId] = useState("");
   const [tab, setTab] = useState<Tab>("MOI");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -205,7 +207,7 @@ export default function OrdersBoard() {
       ? await sb
           .from("order_units")
           .select(
-            "id,group_id,warehouse_id,order_code,status,started_by_name,deferred_by_name,created_at",
+            "id,group_id,warehouse_id,order_code,status,started_by,started_by_name,deferred_by_name,created_at",
           )
           .in("group_id", groupIds)
           .order("created_at", { ascending: true })
@@ -213,6 +215,7 @@ export default function OrdersBoard() {
       : { data: [] as Unit[], error: null };
 
     setRole(p?.role || "");
+    setCurrentUserId(user.id);
     setGroups(g || []);
     setWarehouses(w || []);
     setUnits((u || []) as Unit[]);
@@ -244,6 +247,7 @@ export default function OrdersBoard() {
     };
 
     for (const unit of units) {
+      if (unit.status === "DANG_SOAN" && role === "MEMBER" && unit.started_by !== currentUserId) continue;
       const group = groupMap.get(unit.group_id);
       if (!group) continue;
 
@@ -264,13 +268,14 @@ export default function OrdersBoard() {
     }
 
     return result;
-  }, [groupMap, units]);
+  }, [groupMap, units, role, currentUserId]);
 
   const visible = useMemo(() => {
     const needle = normalizeText(search.trim());
 
     return units
       .filter((unit) => {
+        if (unit.status === "DANG_SOAN" && role === "MEMBER" && unit.started_by !== currentUserId) return false;
         const group = groupMap.get(unit.group_id);
         if (!group) return false;
 
@@ -303,7 +308,7 @@ export default function OrdersBoard() {
           +new Date(a.created_at) - +new Date(b.created_at)
         );
       });
-  }, [groupMap, search, tab, units, whMap]);
+  }, [groupMap, search, tab, units, whMap, role, currentUserId]);
 
   const warehouseGroups = useMemo(() => {
     const result = new Map<

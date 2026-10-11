@@ -225,7 +225,6 @@ export default function NewOrderForm() {
     }
     setPending(null);
     router.replace("/azalas");
-    router.refresh();
   }
 
   async function saveOrder(event: FormEvent) {
@@ -262,7 +261,6 @@ export default function NewOrderForm() {
       if (!images.length) {
         setBusy(false);
         router.replace("/azalas");
-        router.refresh();
         return;
       }
       await uploadPending(result, images);

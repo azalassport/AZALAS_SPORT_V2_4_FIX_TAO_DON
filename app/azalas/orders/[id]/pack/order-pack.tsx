@@ -29,6 +29,7 @@ type Unit = {
   order_code: string;
   status: string;
   started_by_name: string | null;
+  started_by: string | null;
   packing_note: string | null;
 };
 
@@ -151,6 +152,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
   const sb = useMemo(() => createClient(), []);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const cameraFileRef = useRef<HTMLInputElement>(null);
 
   const [unit, setUnit] = useState<Unit | null>(null);
   const [group, setGroup] = useState<Group | null>(null);
@@ -196,7 +198,7 @@ export default function OrderPack({ unitId }: { unitId: number }) {
         sb
           .from("order_units")
           .select(
-            "id,group_id,warehouse_id,order_code,status,started_by_name,packing_note",
+            "id,group_id,warehouse_id,order_code,status,started_by,started_by_name,packing_note",
           )
           .eq("id", unitId)
           .single(),
@@ -209,6 +211,14 @@ export default function OrderPack({ unitId }: { unitId: number }) {
     }
 
     const nextUnit = unitData as Unit;
+    // MEMBER khong duoc mo don DANG_SOAN cua nguoi khac (ke ca URL truc tiep).
+    if (profile?.role === "MEMBER" && nextUnit.status === "DANG_SOAN" && nextUnit.started_by !== user.id) {
+      setError("Đơn này đang được nhân viên khác soạn.");
+      setUnit(null);
+      setGroup(null);
+      setLoading(false);
+      return;
+    }
     setRole(profile?.role || "");
     setUnit(nextUnit);
     setPackingNote(nextUnit.packing_note || "");
@@ -310,6 +320,24 @@ export default function OrderPack({ unitId }: { unitId: number }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomUrl]);
+
+  // Ctrl+V anh tu Zalo / clipboard: tai bang workflow upload anh dang co.
+  useEffect(() => {
+    if (!manager || !group) return;
+    const onPaste = (event: ClipboardEvent) => {
+      if (event.defaultPrevented || uploadBusy) return;
+      const files = Array.from(event.clipboardData?.items || [])
+        .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+        .map((item) => item.getAsFile())
+        .filter((file): file is File => file !== null);
+      if (!files.length) return;
+      event.preventDefault();
+      void uploadExtraImages(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [manager, group?.id, uploadBusy]);
 
   async function startPacking() {
     if (!unit || busy) return;
@@ -810,12 +838,33 @@ export default function OrderPack({ unitId }: { unitId: number }) {
                         : "Bổ sung ảnh đơn đã tạo"}
                     </strong>
                     <span className="mt-1 block text-[12px] font-medium text-slate-500 sm:text-[15px]">
-                      Nhấn để chọn ảnh hoặc kéo thả
+                      Nhấn để chọn ảnh, kéo thả hoặc Ctrl+V để dán
                     </span>
                   </span>
                 </button>
               )}
 
+              {manager && (
+                <button
+                  type="button"
+                  disabled={uploadBusy}
+                  onClick={() => cameraFileRef.current?.click()}
+                  className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-emerald-50 px-5 py-3 text-[15px] font-extrabold text-emerald-800 hover:bg-emerald-100 disabled:opacity-50"
+                >
+                  <Camera size={21} /> Chụp ảnh bằng camera
+                </button>
+              )}
+              <input
+                ref={cameraFileRef}
+                type="file"
+                className="hidden"
+                accept="image/*"
+                capture="environment"
+                onChange={(event) => {
+                  void uploadExtraImages(Array.from(event.currentTarget.files || []));
+                  event.currentTarget.value = "";
+                }}
+              />
               <input
                 ref={fileRef}
                 type="file"
