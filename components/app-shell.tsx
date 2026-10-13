@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrl } from "@/lib/azalas/media-client";
 import { isManager, type Role } from "@/lib/azalas/permissions";
 import { dt } from "@/lib/azalas/format";
 import {
@@ -109,10 +110,7 @@ export default function AppShell({
     setToday(dt(new Date().toISOString()));
 
     if (profile.avatar_path) {
-      sb.storage
-        .from("az-avatars")
-        .createSignedUrl(profile.avatar_path, 1800)
-        .then(({ data }) => setAvatar(data?.signedUrl || ""));
+      void mediaUrl(sb,"az-avatars",profile.avatar_path,1800).then(setAvatar).catch(()=>setAvatar(""));
     }
   }, [profile.avatar_path, sb]);
 
