@@ -30,7 +30,7 @@ const operations = [
     title: "Tạo đơn",
     description: "Tạo đơn thường/khách đặt, chọn nhiều kho",
     icon: ClipboardPlus,
-    manager: true,
+    manager: false,
     accent: "#1670ff",
     soft: "#e9f2ff",
   },
