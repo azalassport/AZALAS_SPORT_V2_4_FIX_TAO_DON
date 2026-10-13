@@ -63,3 +63,11 @@ From read-only SQL result supplied by owner:
 **Additional hardening:** generic R2 viewing is now allowed only for the object's uploader or authorized users with a corresponding database link. File possession alone does not grant access.
 
 **Next action:** run `npm run typecheck` and `npm run build:vinext` locally and provide output. Then inspect missing RPC dependencies using read-only SQL, restore one verified RPC at a time with backward compatibility. Do not execute actual stock/returns/pattern financial operations on Preview while sharing a production database.
+
+### Preview write gates after audit
+Frontend stops before R2 upload for missing live RPCs:
+- Pattern House and Customer entry: `R2_PATTERN_SLIP_READY = false`.
+- Stock product image link: `R2_PRODUCT_LINK_READY = false`.
+- Account/avatar image updates: `R2_AVATAR_PROFILE_READY = false`.
+The user is shown a clear error instead of creating an orphan R2 object or writing an incompatible path to the live DB. Do **not** flip gates to true until their RPCs are present, support R2, and the shared Production DB impact has been assessed.
+Direct returns still upload to the old Supabase private bucket, matching the deployed `az_return_finalize_direct` anti-replay checks. New R2 return read helper remains for a future secure migration.
