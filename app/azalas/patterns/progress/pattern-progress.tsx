@@ -21,7 +21,7 @@ type Job = {
 };
 type JobExtra = Pick<Job, "id" | "entry_slip_id" | "pattern_id" | "sewing_house_id" |
   "size_range" | "size_ratio" | "layer_count" | "cutter_id" | "sewing_price" | "forced_closed_at" |
-  "paid_at" | "paid_amount" | "payment_method" | "expected_warehouse_id">;
+  "paid_at" | "paid_amount" | "payment_method" | "expected_warehouse_id" | "delivery_date">;
 type Slip = { id: number; slip_code: string; mam_code: string; fabric_id: number | null;
   expected_warehouse_id: number | null; preview_image_path: string; image_paths: string[]; color_mode: string };
 type SizePlan = { id: number; job_id: number; color: string; size: string; layers: number; ratio: number; planned_qty: number };
@@ -127,7 +127,7 @@ export default function PatternProgress() {
       }
       const [jobResult, planResult, receiptResult, eventResult, housesResult, cuttersResult, patternsResult,
         fabricsResult, warehouseResult, vetStatusResult] = await Promise.all([
-        sb.from("pattern_jobs").select("id,entry_slip_id,pattern_id,sewing_house_id,cutter_id,size_range,size_ratio,layer_count,sewing_price,forced_closed_at,paid_at,paid_amount,payment_method,expected_warehouse_id")
+        sb.from("pattern_jobs").select("id,entry_slip_id,pattern_id,sewing_house_id,cutter_id,size_range,size_ratio,layer_count,sewing_price,forced_closed_at,paid_at,paid_amount,payment_method,expected_warehouse_id,delivery_date")
           .in("id", ids).limit(500),
         sb.from("pattern_job_size_plans").select("id,job_id,color,size,layers,ratio,planned_qty")
           .in("job_id", ids).order("id").limit(4000),
@@ -148,7 +148,7 @@ export default function PatternProgress() {
       if (firstError) throw new Error("Không tải được chi tiết Tiến độ: " + firstError.message + ". Kiểm tra đã chạy SQL 13, 15, 17 và SQL 23 hàng vét.");
       const extras = (jobResult.data || []) as JobExtra[];
       const byId = new Map(extras.map(job => [job.id, job]));
-      const enriched = basic.map(job => ({ ...job, ...(byId.get(job.id) || {}) }));
+      const enriched = basic.map(job => { const extra=byId.get(job.id); return { ...job, ...extra, delivery_date: extra?.delivery_date || job.delivery_date }; });
       const slipIds = [...new Set(extras.map(job => job.entry_slip_id).filter((id): id is number => id != null))];
       let loadedSlips: Slip[] = [];
       if (slipIds.length) {
