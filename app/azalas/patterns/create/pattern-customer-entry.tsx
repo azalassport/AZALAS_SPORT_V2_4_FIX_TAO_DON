@@ -1,5 +1,6 @@
 "use client";
 
+import { R2_PATTERN_SLIP_READY, R2_SQL_BLOCKED_MESSAGE } from "@/lib/azalas/r2-rollout-gates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -97,6 +98,7 @@ export default function PatternCustomerEntry() {
   async function save() {
     setError(""); setOk("");
     if (busy) return;
+    if (!R2_PATTERN_SLIP_READY) return setError(R2_SQL_BLOCKED_MESSAGE);
     if (!files.length || files.length > 12) return setError("Cần 1–12 ảnh rập/sản phẩm. Có thể chụp, tải lên hoặc Ctrl + V.");
     if (!form.cutDate || !form.deliveryDate || !form.customerId || !form.patternId || !form.houseId || !form.cutterId)
       return setError("Chọn đủ ngày cắt, ngày giao, khách hàng, mã rập, nhà may và thợ cắt.");
