@@ -46,7 +46,7 @@ DECLARE
   v_color_obj jsonb; v_image_obj jsonb;
   v_path text; v_preview text; v_color text; v_brand text; v_code text; v_product text;
   v_size text; v_ratio_text text; v_size_range text; v_mode text;
-  v_pattern_id bigint; v_price numeric; v_layers integer; v_ratio integer;
+  v_pattern_id bigint; v_common_pattern_id bigint; v_price numeric; v_layers integer; v_ratio integer;
   v_model_qty bigint; v_total bigint; v_check_total bigint := 0; v_layer_count bigint;
   v_i integer; v_key text; v_price_text text;
   v_seen_paths text[] := ARRAY[]::text[]; v_seen_colors text[];
@@ -84,7 +84,7 @@ BEGIN
 
   IF v_cut IS NULL OR v_house IS NULL OR v_cutter IS NULL
      OR v_wh IS NULL OR v_fabric IS NULL
-     OR v_mode NOT IN ('common','perModel')
+     OR v_mode IS NULL OR v_mode NOT IN ('common','perModel')
      OR v_total IS NULL OR v_total<1 OR v_total>100000000
      OR v_preview IS NULL
   THEN RAISE EXCEPTION 'Ngay cat, nha may, tho cat, kho, vai hoac tong khong hop le'; END IF;
@@ -144,6 +144,10 @@ BEGIN
   FOR v_model IN SELECT value FROM jsonb_array_elements(v_models) LOOP
     IF jsonb_typeof(v_model)<>'object' THEN RAISE EXCEPTION 'Mau Rập sai dinh dang'; END IF;
     v_pattern_id := nullif(v_model->>'pattern_id','')::bigint;
+    IF v_pattern_id IS NULL THEN RAISE EXCEPTION 'Chua chon ma rap'; END IF;
+    IF v_common_pattern_id IS NULL THEN v_common_pattern_id:=v_pattern_id;
+    ELSIF v_pattern_id<>v_common_pattern_id THEN
+      RAISE EXCEPTION 'Mot phieu PNR chi duoc chon mot ma rap chung'; END IF;
     v_brand := btrim(coalesce(v_model->>'brand',''));
     v_key := coalesce(v_pattern_id::text,'')||'/'||upper(v_brand);
     IF v_brand='' OR length(v_brand)>120 OR v_key=ANY(v_seen_keys)
@@ -302,6 +306,8 @@ BEGIN
   THEN RAISE EXCEPTION 'Can 1-12 anh'; END IF;
 
   v_first_path:=v_images->>0;
+  IF v_first_path IS NULL OR btrim(v_first_path)='' THEN
+    RAISE EXCEPTION 'Chua co anh mau de tao rap'; END IF;
   PERFORM pg_catalog.pg_advisory_xact_lock(
     pg_catalog.hashtextextended('az-customer-rap:'||v_first_path,0)
   );
