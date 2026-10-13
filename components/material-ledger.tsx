@@ -228,7 +228,22 @@ export default function MaterialLedger({category,title,book}:{category:Category;
   }
 
   async function openPdf(path:string|null){
-    if(!path)return;const {data,error}=await sb.storage.from("az-supply-documents").createSignedUrl(path,3600);if(error)return setErr(error.message);window.open(data.signedUrl,"_blank","noopener,noreferrer");
+    if(!path)return;
+    if(path.startsWith("r2:")){
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)return setErr("Hết phiên đăng nhập");
+      const response=await fetch("/api/azalas/fabric-files?path="+encodeURIComponent(path),{
+        headers:{Authorization:`Bearer ${session.access_token}`}
+      });
+      if(!response.ok){const result=await response.json().catch(()=>({error:"Không đọc được ảnh R2"}));return setErr(result.error||"Không đọc được ảnh R2")}
+      const blob=await response.blob(),url=URL.createObjectURL(blob);
+      window.open(url,"_blank","noopener,noreferrer");
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      return;
+    }
+    const {data,error}=await sb.storage.from("az-supply-documents").createSignedUrl(path,3600);
+    if(error)return setErr(error.message);
+    window.open(data.signedUrl,"_blank","noopener,noreferrer");
   }
 
   function fabricCalc(r:FabricRow){
@@ -268,12 +283,32 @@ export default function MaterialLedger({category,title,book}:{category:Category;
     if(!user)return setErr("Không xác định được tài khoản đăng nhập");
     const documentPath=`${user.id}/vai/${Date.now()}-${crypto.randomUUID()}.png`;
     setBusy(true);
-    const {error:uploadError}=await sb.storage.from("az-supply-documents").upload(documentPath,fabricInvoiceBlob,{contentType:"image/png",upsert:false});
-    if(uploadError){setBusy(false);return setErr(`Không lưu được ảnh phiếu: ${uploadError.message}`)}
-    const payloadWithImage=entryPayload.map(x=>({...x,document_path:documentPath}));
+    let uploadedPath="";
+    try{
+      const form=new FormData();
+      form.append("file",new File([fabricInvoiceBlob],"fabric-invoice.png",{type:"image/png"}));
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)throw new Error("Hết phiên đăng nhập");
+      const response=await fetch("/api/azalas/fabric-files",{
+        method:"POST",headers:{Authorization:`Bearer ${session.access_token}`},body:form
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||"Không lưu được ảnh lên R2");
+      uploadedPath=String(result.path||"");
+      if(!uploadedPath.startsWith("r2:"))throw new Error("R2 không trả về mã ảnh hợp lệ");
+    }catch(e){
+      setBusy(false);
+      return setErr(`Không lưu được ảnh phiếu lên R2: ${e instanceof Error?e.message:String(e)}`);
+    }
+    const payloadWithImage=entryPayload.map(x=>({...x,document_path:uploadedPath}));
     const {error}=await sb.rpc("az_supply_save_fabric_batch",{p_partner_id:partner,p_entries:payloadWithImage,p_payments:payPayload});
     if(error){
-      await sb.storage.from("az-supply-documents").remove([documentPath]);
+      const {data:{session}}=await sb.auth.getSession();
+      if(session)await fetch("/api/azalas/fabric-files",{
+        method:"DELETE",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},
+        body:JSON.stringify({path:uploadedPath})
+      }).catch(()=>{});
+
       setBusy(false);return setErr(error.message);
     }
     setBusy(false);setFabricRows([newFabricRow()]);setFabricCopiedSignature("");setFabricInvoiceBlob(null);setFabricPreview(false);setOk("Đã lưu phiếu Vải và ảnh hóa đơn.");await load();
