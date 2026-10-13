@@ -1,0 +1,158 @@
+-- AZALAS SPORT | SQL 36 | BO SUNG RPC LUU PHIEU VAI VA DUONG DAN R2
+-- Dua tren migration 35_VAI_LUU_ANH_HOA_DON_CONG_NO.sql.
+-- KHONG reset, xoa, sua hoac tao bang; khong ghi du lieu nghiep vu.
+-- Tao DUY NHAT ham thieu, cap quyen goi ham cho authenticated.
+-- Neu co cot/function phu thuoc bi thieu, script dung, ROLLBACK.
+
+BEGIN;
+
+-- 1. PRE-FLIGHT: khong tac dong du lieu
+DO $preflight$
+DECLARE v_missing text;
+BEGIN
+  IF to_regclass('public.supply_partners') IS NULL
+     OR to_regclass('public.supply_entries') IS NULL
+     OR to_regclass('public.supply_payments') IS NULL THEN
+    RAISE EXCEPTION 'Thieu bang supply_*; SQL dung, khong thay doi database';
+  END IF;
+
+  IF to_regprocedure('public.az_is_manager()') IS NULL THEN
+    RAISE EXCEPTION 'Thieu ham public.az_is_manager(); SQL dung, khong thay doi database';
+  END IF;
+
+  SELECT string_agg(req.tbl || '.' || req.col, ', ' ORDER BY req.tbl, req.col)
+  INTO v_missing
+  FROM (VALUES
+    ('supply_partners','id'),
+    ('supply_partners','category'),
+    ('supply_entries','partner_id'),
+    ('supply_entries','category'),
+    ('supply_entries','entry_date'),
+    ('supply_entries','item_name'),
+    ('supply_entries','quantity'),
+    ('supply_entries','unit'),
+    ('supply_entries','unit_price'),
+    ('supply_entries','note'),
+    ('supply_entries','created_by'),
+    ('supply_entries','entry_kind'),
+    ('supply_entries','tree_count'),
+    ('supply_entries','raw_quantity'),
+    ('supply_entries','depreciation'),
+    ('supply_entries','transport_fee'),
+    ('supply_entries','document_path'),
+    ('supply_payments','partner_id'),
+    ('supply_payments','paid_at'),
+    ('supply_payments','method'),
+    ('supply_payments','amount'),
+    ('supply_payments','note'),
+    ('supply_payments','created_by'),
+    ('supply_payments','payment_kind'),
+    ('supply_payments','month_key')
+  ) AS req(tbl,col)
+  LEFT JOIN information_schema.columns c
+    ON c.table_schema='public'
+   AND c.table_name=req.tbl
+   AND c.column_name=req.col
+  WHERE c.column_name IS NULL;
+
+  IF v_missing IS NOT NULL THEN
+    RAISE EXCEPTION 'Thieu cot: %. SQL dung, khong thay doi database', v_missing;
+  END IF;
+END;
+$preflight$;
+
+-- 2. RPC: mot lan luu nhap / tra vai va thanh toan trong 1 transaction.
+-- document_path duoc luu nguyen gia tri (r2:... hoac legacy Supabase path).
+-- KHONG doi chieu storage.objects: anh moi duoc luu trong Cloudflare R2.
+CREATE OR REPLACE FUNCTION public.az_supply_save_fabric_batch(
+  p_partner_id bigint,
+  p_entries jsonb DEFAULT '[]'::jsonb,
+  p_payments jsonb DEFAULT '[]'::jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = ''
+AS $fabric$
+DECLARE
+  v_item jsonb;
+  v_user uuid := auth.uid();
+  v_entry_count integer := 0;
+  v_payment_count integer := 0;
+BEGIN
+  IF v_user IS NULL OR NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Khong co quyen luu phu lieu';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM public.supply_partners
+    WHERE id=p_partner_id AND category='VAI'
+  ) THEN
+    RAISE EXCEPTION 'Nha vai khong hop le';
+  END IF;
+
+  IF jsonb_typeof(coalesce(p_entries,'[]'::jsonb)) <> 'array'
+      OR jsonb_typeof(coalesce(p_payments,'[]'::jsonb)) <> 'array' THEN
+    RAISE EXCEPTION 'Du lieu phieu Vai khong dung dinh dang mang';
+  END IF;
+
+  FOR v_item IN SELECT value FROM jsonb_array_elements(coalesce(p_entries,'[]'::jsonb))
+  LOOP
+    INSERT INTO public.supply_entries(
+      partner_id,category,entry_date,item_name,quantity,unit,unit_price,note,created_by,
+      entry_kind,tree_count,raw_quantity,depreciation,transport_fee,document_path
+    ) VALUES (
+      p_partner_id,
+      'VAI',
+      (v_item->>'entry_date')::date,
+      btrim(v_item->>'item_name'),
+      (v_item->>'quantity')::numeric,
+      coalesce(nullif(btrim(v_item->>'unit'),''),'Kg'),
+      (v_item->>'unit_price')::numeric,
+      nullif(btrim(coalesce(v_item->>'note','')),''),
+      v_user,
+      coalesce(nullif(v_item->>'entry_kind',''),'NORMAL'),
+      nullif(v_item->>'tree_count','')::numeric,
+      nullif(v_item->>'raw_quantity','')::numeric,
+      nullif(v_item->>'depreciation','')::numeric,
+      coalesce(nullif(v_item->>'transport_fee','')::numeric,0),
+      nullif(btrim(coalesce(v_item->>'document_path','')),'')
+    );
+    v_entry_count := v_entry_count + 1;
+  END LOOP;
+
+  FOR v_item IN SELECT value FROM jsonb_array_elements(coalesce(p_payments,'[]'::jsonb))
+  LOOP
+    INSERT INTO public.supply_payments(
+      partner_id,paid_at,method,amount,note,created_by,payment_kind,month_key
+    ) VALUES (
+      p_partner_id,
+      (v_item->>'paid_at')::date,
+      coalesce(nullif(v_item->>'method',''),'CHUYEN_KHOAN'),
+      (v_item->>'amount')::numeric,
+      nullif(btrim(coalesce(v_item->>'note','')),''),
+      v_user,'PAYMENT',NULL
+    );
+    v_payment_count := v_payment_count + 1;
+  END LOOP;
+
+  RETURN jsonb_build_object('ok',true,'entries',v_entry_count,'payments',v_payment_count);
+END;
+$fabric$;
+
+-- 3. Chi authenticated co the goi ham; role OWNER/ADMIN kiem tra ben trong ham.
+REVOKE ALL ON FUNCTION public.az_supply_save_fabric_batch(bigint,jsonb,jsonb) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.az_supply_save_fabric_batch(bigint,jsonb,jsonb) TO authenticated;
+
+-- PostgREST nhan thay RPC moi sau khi transaction commit.
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- 4. XAC NHAN CHI DOC - KHONG GOI RPC; KHONG GHI PHIEU HAY CONG NO
+SELECT
+  to_regprocedure('public.az_supply_save_fabric_batch(bigint,jsonb,jsonb)') IS NOT NULL AS ham_da_tao,
+  EXISTS(
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public'
+      AND table_name='supply_entries'
+      AND column_name='document_path'
+  ) AS co_cot_duong_dan_anh;
