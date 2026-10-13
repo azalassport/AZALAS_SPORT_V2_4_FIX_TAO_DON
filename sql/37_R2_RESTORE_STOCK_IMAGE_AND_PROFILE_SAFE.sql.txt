@@ -58,7 +58,7 @@ BEGIN
 
   IF left(p_path,3)='r2:' THEN
     IF p_path !~ (
-      '^r2:' || auth.uid()::text || '/product/[0-9a-f-]{36}\\.(png|jpg|webp)$'
+      '^r2:' || auth.uid()::text || '/product/[0-9a-f-]{36}[.](png|jpg|webp)$'
     ) THEN
       RAISE EXCEPTION 'Duong dan R2 san pham khong hop le';
     END IF;
@@ -121,7 +121,7 @@ BEGIN
   IF v_path IS NOT NULL AND v_path IS DISTINCT FROM v_old_path THEN
     IF left(v_path,3)='r2:' THEN
       IF v_path !~ (
-        '^r2:' || v_uid::text || '/avatar/[0-9a-f-]{36}\\.(png|jpg|webp)$'
+        '^r2:' || v_uid::text || '/avatar/[0-9a-f-]{36}[.](png|jpg|webp)$'
       ) THEN
         RAISE EXCEPTION 'Duong dan R2 avatar khong hop le';
       END IF;
