@@ -71,3 +71,16 @@ Frontend stops before R2 upload for missing live RPCs:
 - Account/avatar image updates: `R2_AVATAR_PROFILE_READY = false`.
 The user is shown a clear error instead of creating an orphan R2 object or writing an incompatible path to the live DB. Do **not** flip gates to true until their RPCs are present, support R2, and the shared Production DB impact has been assessed.
 Direct returns still upload to the old Supabase private bucket, matching the deployed `az_return_finalize_direct` anti-replay checks. New R2 return read helper remains for a future secure migration.
+
+## SQL 38 live constraints audit (13/10/2026)
+- SQL 38 CSV shows `pattern_entry_slips.image_paths` is `jsonb`, not `text[]`.
+- `pattern_job_size_plans.ratio` must be 1..9 and `layers > 0`; `ratio=0` sizes are excluded, not inserted.
+- `pattern_entry_slips.request_key` unique, `mam_code` unique, `preview_image_path` unique; one shared slip may contain multiple model jobs.
+- Stock movement qty_delta cannot be zero; stock balance cannot go negative.
+- `pattern_jobs` had no delivery_date column. SQL 39 adds a nullable standalone customer-pattern date, without touching order_group.
+
+## New migrations after SQL 38
+- `sql/39_R2_RESTORE_PATTERN_CREATE_SAFE.sql.txt` — transactional missing house/customer creation RPCs, **not executed or tested on Supabase by the assistant**. Existing legacy files and new R2 references supported. Does not write inventory or debt. Creates a nullable customer `delivery_date` on `pattern_jobs`. The current `az_pattern_progress()` still obtains delivery_date from order_groups and is NOT changed by SQL 39; customer due dates need a future display patch after the migration is verified.
+- `sql/40_R2_RESTORE_STOCK_OPERATIONS_SAFE.sql.txt` — restores `az_stock_upsert_product` and `az_stock_set_quantity` from existing app migration SQL 04 with live stock constraints. No stock entries change merely by installing functions.
+
+**Do not run these on an unconfirmed Supabase project.** The Preview shares the Production database. Both SQL files refuse to overwrite existing RPC signatures and run inside a transaction. The R2 rollout gates remain closed until the user sends the SQL result and the workflows are checked. SQL 39 cannot prove that an R2 object exists within PostgreSQL; Cloudflare's authenticated upload creates the object and the SQL validates owner/path only. A server-side file registry is needed for stronger cryptographic upload verification before high-stakes workflows.
