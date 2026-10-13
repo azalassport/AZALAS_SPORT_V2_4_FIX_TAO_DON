@@ -207,7 +207,10 @@ export default function MaterialLedger({category,title,book}:{category:Category;
       const {error}=await sb.from("supply_entries").insert({partner_id:fixedPartner.id,category,entry_date:`${closeForm.month}-01`,item_name:"Chốt tháng",quantity:1,unit:"tháng",unit_price:amount,note:category==="IN"?(closeForm.note.trim()||null):null,entry_kind:"MONTHLY_CLOSE",document_path:documentPath,created_by:user?.id});
       if(error)throw error;
       setCloseForm({month:vnToday().slice(0,7),amount:"",note:"",file:null});setOk(`Đã chốt ${title}.`);await load();
-    }catch(e){// Keep any orphaned R2 object on failed save; never delete an already-linked document.setErr(e instanceof Error?e.message:String(e));}
+    }catch(e){
+      // Never delete a potentially linked R2 document during a failed save.
+      setErr(e instanceof Error?e.message:String(e));
+    }
     finally{setBusy(false)}
   }
 
