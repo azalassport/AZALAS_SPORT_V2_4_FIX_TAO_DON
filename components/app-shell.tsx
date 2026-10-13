@@ -32,7 +32,7 @@ const groups = [
     title: "ĐIỀU HÀNH",
     items: [
       { href: "/azalas", title: "Tổng quan", icon: LayoutDashboard, manager: false },
-      { href: "/azalas/orders/new", title: "Tạo đơn", icon: ClipboardPlus, manager: true },
+      { href: "/azalas/orders/new", title: "Tạo đơn", icon: ClipboardPlus, manager: false },
       { href: "/azalas/orders", title: "Chi tiết đơn", icon: ClipboardList, manager: false },
       { href: "/azalas/invoices", title: "Hóa đơn", icon: ReceiptText, manager: true },
       { href: "/azalas/returns", title: "Hàng trả", icon: RotateCcw, manager: false },
@@ -129,8 +129,7 @@ export default function AppShell({
 
   const restrictMember =
     !allowed &&
-    (path.startsWith("/azalas/orders/new") ||
-      path.startsWith("/azalas/invoices") ||
+    (path.startsWith("/azalas/invoices") ||
       path.startsWith("/azalas/customers") ||
       path.startsWith("/azalas/stock") ||
       path.startsWith("/azalas/materials") ||
@@ -149,8 +148,8 @@ export default function AppShell({
   const mobileStockHref = allowed ? "/azalas/stock" : "/azalas/images";
   const mobileStockTitle = allowed ? "Kho hàng" : "Kho ảnh";
   const MobileStockIcon = allowed ? Boxes : Images;
-  const centerHref = allowed ? "/azalas/orders/new" : "/azalas/orders";
-  const CenterIcon = allowed ? ClipboardPlus : ClipboardList;
+  const centerHref = "/azalas/orders/new";
+  const CenterIcon = ClipboardPlus;
 
   return (
     <div className="az-shell az-shell-v2">
