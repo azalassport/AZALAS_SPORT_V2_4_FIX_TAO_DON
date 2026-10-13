@@ -1,0 +1,118 @@
+-- AZALAS SPORT | STOCK RPC RESTORE | PREVIEW R2 SUPPORT
+-- Migration bo sung, khong reset, khong doi ton kho/hang hoa hien co.
+-- Based on original app SQL 04 and LIVE constraints from SQL 38 (13/10/2026).
+-- DOES NOT enable any frontend rollout gate.
+BEGIN;
+DO $preflight$
+BEGIN
+  IF to_regprocedure('public.az_stock_upsert_product(text,text,text,text,text,text,text)') IS NOT NULL
+    OR to_regprocedure('public.az_stock_set_quantity(bigint,bigint,bigint,text)') IS NOT NULL THEN
+    RAISE EXCEPTION 'STOP: RPC kho da ton tai. Khong ghi de.';
+  END IF;
+  IF to_regclass('public.az_product_variants') IS NULL
+    OR to_regclass('public.az_stock_balances') IS NULL
+    OR to_regclass('public.az_stock_movements') IS NULL
+    OR to_regclass('public.az_warehouses') IS NULL
+    OR to_regprocedure('public.az_is_manager()') IS NULL THEN
+    RAISE EXCEPTION 'STOP: thieu CORE kho, khong cai dat.';
+  END IF;
+END;
+$preflight$;
+
+-- Same semantics as original AZALAS V2.2: one internal code, many variant records by distinct codes.
+CREATE FUNCTION public.az_stock_upsert_product(
+  p_internal_code text,
+  p_sales_code text,
+  p_product_name text,
+  p_color text DEFAULT '',
+  p_size text DEFAULT '',
+  p_brand text DEFAULT NULL,
+  p_pattern_code text DEFAULT NULL
+) RETURNS bigint
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+DECLARE v_id bigint;
+BEGIN
+  IF NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Chi OWNER/ADMIN duoc tao danh muc';
+  END IF;
+  IF nullif(btrim(p_internal_code),'') IS NULL
+    OR nullif(btrim(p_sales_code),'') IS NULL
+    OR nullif(btrim(p_product_name),'') IS NULL THEN
+    RAISE EXCEPTION 'Nhap ma noi bo, ma ban hang va ten san pham';
+  END IF;
+  INSERT INTO public.az_product_variants(
+    internal_code,sales_code,product_name,color,size,brand,pattern_code
+  ) VALUES(
+    upper(btrim(p_internal_code)),upper(btrim(p_sales_code)),btrim(p_product_name),
+    coalesce(btrim(p_color),''),coalesce(btrim(p_size),''),
+    nullif(btrim(p_brand),''),nullif(btrim(p_pattern_code),'')
+  )
+  ON CONFLICT(internal_code) DO UPDATE SET
+    sales_code=excluded.sales_code,
+    product_name=excluded.product_name,
+    color=excluded.color,
+    size=excluded.size,
+    brand=excluded.brand,
+    pattern_code=excluded.pattern_code,
+    is_active=true
+  RETURNING id INTO v_id;
+  RETURN v_id;
+END $fn$;
+
+-- Adjust stock atomically, never negative, write a movement only when quantity changes.
+CREATE FUNCTION public.az_stock_set_quantity(
+  p_variant_id bigint,
+  p_warehouse_id bigint,
+  p_quantity bigint,
+  p_reason text DEFAULT 'KIEM_KE_TEST'
+) RETURNS bigint
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+DECLARE v_before bigint; v_delta bigint;
+BEGIN
+  IF NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Chi OWNER/ADMIN duoc nhap ton';
+  END IF;
+  IF p_quantity IS NULL OR p_quantity < 0 OR p_quantity > 100000000 THEN
+    RAISE EXCEPTION 'So luong ton khong hop le';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.az_product_variants
+                 WHERE id=p_variant_id AND is_active)
+    OR NOT EXISTS (SELECT 1 FROM public.az_warehouses
+                   WHERE id=p_warehouse_id AND is_active) THEN
+    RAISE EXCEPTION 'San pham hoac kho khong ton tai';
+  END IF;
+  INSERT INTO public.az_stock_balances(variant_id,warehouse_id,qty_on_hand)
+  VALUES (p_variant_id,p_warehouse_id,0)
+  ON CONFLICT (variant_id,warehouse_id) DO NOTHING;
+
+  SELECT qty_on_hand INTO v_before FROM public.az_stock_balances
+  WHERE variant_id=p_variant_id AND warehouse_id=p_warehouse_id FOR UPDATE;
+  v_delta:=p_quantity-v_before;
+  UPDATE public.az_stock_balances
+  SET qty_on_hand=p_quantity,updated_at=clock_timestamp()
+  WHERE variant_id=p_variant_id AND warehouse_id=p_warehouse_id;
+
+  IF v_delta <> 0 THEN
+    INSERT INTO public.az_stock_movements(
+      variant_id,warehouse_id,qty_delta,reason,actor_id
+    ) VALUES (
+      p_variant_id,p_warehouse_id,v_delta,
+      coalesce(nullif(btrim(p_reason),''),'DIEU_CHINH_TON'),auth.uid()
+    );
+  END IF;
+  RETURN p_quantity;
+END $fn$;
+
+REVOKE ALL ON FUNCTION public.az_stock_upsert_product(text,text,text,text,text,text,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.az_stock_upsert_product(text,text,text,text,text,text,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.az_stock_set_quantity(bigint,bigint,bigint,text) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.az_stock_set_quantity(bigint,bigint,bigint,text) TO authenticated;
+NOTIFY pgrst,'reload schema';
+COMMIT;
+
+-- CHI DOC: no stock transaction is created by this verification query.
+SELECT
+  to_regprocedure('public.az_stock_upsert_product(text,text,text,text,text,text,text)') IS NOT NULL AS upsert_ok,
+  to_regprocedure('public.az_stock_set_quantity(bigint,bigint,bigint,text)') IS NOT NULL AS quantity_ok;
