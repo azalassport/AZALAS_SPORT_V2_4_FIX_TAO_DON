@@ -1,0 +1,130 @@
+-- AZALAS SPORT | SQL 43 | MEMBER TAO DON (CAI DAT THEO QUYEN HAN HEP)
+--
+-- DUOC SOAN TU KET QUA SQL 42 (CSV) CUA DATABASE APP CHINH.
+-- CHUA DUOC CHAY / KIEM THU TRUC TIEP TREN SUPABASE.
+-- XEM KY TRUOC KHI CHAY: SCRIPT NAY DOI QUYEN NGAY TREN DATABASE DANG DUNG CHUNG.
+--
+-- CHI CAP THEM:
+--   * MEMBER da kich hoat: tao don THUONG/KHACH_DAT bang az_create_order
+--   * MEMBER da kich hoat: doc ten + SĐT + ID KH de chon khach da co
+--   * MEMBER da kich hoat: upload anh vao bucket az-order-images duoi thu muc cua minh
+--   * MEMBER da kich hoat: gan anh CHI VAO DON DO MINH TAO
+--
+-- KHONG DOI: ma don, tach kho, soan don, hoa don, cong no, xoa don,
+--            tao khach moi, tao kho moi, noi dung anh cu.
+-- KHONG RESET DB. KHONG GHI DU LIEU DON HANG HAY CONG NO KHI CAI DAT.
+--
+-- 1 transaction: neu mot buoc loi, tat ca thay doi cua migration duoc rollback.
+BEGIN;
+
+DO $preflight_and_minimal_functions$
+DECLARE
+  v_order_src text;
+  v_attach_src text;
+  v_old_create_guard constant text :=
+    'IF NOT public.az_is_manager() THEN RAISE EXCEPTION ''Khong co quyen tao don''; END IF;';
+  v_old_attach_guard constant text :=
+    'IF NOT public.az_is_manager() THEN RAISE EXCEPTION ''Khong co quyen them anh don''; END IF;';
+  v_new_create_guard constant text :=
+    'IF NOT public.az_is_staff() THEN RAISE EXCEPTION ''Khong co quyen tao don''; END IF;';
+  v_new_attach_guard constant text :=
+    'IF NOT public.az_is_staff() THEN RAISE EXCEPTION ''Khong co quyen them anh don''; END IF;'
+    || E'\n'
+    || ' IF NOT public.az_is_manager() AND NOT EXISTS ('
+    || 'SELECT 1 FROM public.order_groups g WHERE g.id=p_group_id AND g.created_by=auth.uid()'
+    || ') THEN RAISE EXCEPTION ''MEMBER chi duoc gan anh vao don do minh tao''; END IF;';
+BEGIN
+  -- Reject schema drift; NEVER silently replace a different live RPC.
+  IF to_regprocedure('public.az_create_order(bigint,public.az_order_type,text[],date,boolean,text)') IS NULL
+     OR to_regprocedure('public.az_attach_order_image(bigint,text)') IS NULL
+     OR to_regprocedure('public.az_is_staff()') IS NULL
+     OR to_regprocedure('public.az_is_manager()') IS NULL
+     OR to_regclass('public.order_groups') IS NULL
+     OR to_regclass('public.az_customers') IS NULL
+     OR to_regclass('storage.objects') IS NULL
+  THEN RAISE EXCEPTION 'STOP: thieu CORE tao don hoac Storage'; END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname='az_order_customer_options'
+  ) THEN RAISE EXCEPTION 'STOP: az_order_customer_options da ton tai, khong ghi de'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='order_groups'
+      AND column_name='created_by' AND data_type='uuid'
+  ) THEN RAISE EXCEPTION 'STOP: thieu order_groups.created_by uuid'; END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='storage' AND tablename='objects'
+      AND policyname='az_order_upload_v1' AND cmd='INSERT'
+      AND array_to_string(roles,',')='authenticated'
+      AND with_check LIKE '%az_is_manager()%'
+      AND with_check LIKE '%az-order-images%'
+      AND with_check LIKE '%storage.foldername%'
+  ) THEN RAISE EXCEPTION 'STOP: chinh sach upload anh da doi, can kiem tra lai'; END IF;
+
+  SELECT pg_get_functiondef(
+    to_regprocedure('public.az_create_order(bigint,public.az_order_type,text[],date,boolean,text)')
+  ) INTO v_order_src;
+  SELECT pg_get_functiondef(
+    to_regprocedure('public.az_attach_order_image(bigint,text)')
+  ) INTO v_attach_src;
+
+  IF position(v_old_create_guard IN v_order_src)=0
+     OR position(v_old_attach_guard IN v_attach_src)=0
+  THEN RAISE EXCEPTION 'STOP: SQL thuc te cua RPC khong khop SQL 42'; END IF;
+
+  -- Preserve the entire installed RPC body; switch ONLY the gate from
+  -- manager -> active staff.  No reimplementation of order-number logic.
+  EXECUTE replace(v_order_src,v_old_create_guard,v_new_create_guard);
+
+  -- Managers still attach images to any order. MEMBER may only attach to
+  -- a group that was created by that same member, not others' orders.
+  EXECUTE replace(v_attach_src,v_old_attach_guard,v_new_attach_guard);
+END
+$preflight_and_minimal_functions$;
+
+-- Security definer narrow selector: only ID, name and phone, NOT address,
+-- transport information, invoices, credit or other private customer records.
+-- No direct member SELECT policy on public.az_customers.
+CREATE FUNCTION public.az_order_customer_options()
+RETURNS TABLE(id bigint, name text, phone text)
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path=''
+AS $fn$
+  SELECT c.id,c.name,c.phone
+  FROM public.az_customers c
+  WHERE public.az_is_staff()
+  ORDER BY c.id DESC
+  LIMIT 500
+$fn$;
+REVOKE ALL ON FUNCTION public.az_order_customer_options() FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.az_order_customer_options() TO authenticated;
+
+-- Narrow storage policy. Existing signed-image READ remains untouched.
+-- No UPDATE/DELETE privileges; new objects must be in user's own folder.
+ALTER POLICY az_order_upload_v1 ON storage.objects
+  TO authenticated
+  WITH CHECK (
+    bucket_id='az-order-images'
+    AND public.az_is_staff()
+    AND (storage.foldername(name))[1]=auth.uid()::text
+  );
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- READ-ONLY verification. Does not create an order or upload images.
+SELECT
+  to_regprocedure('public.az_order_customer_options()') IS NOT NULL AS customer_lookup_ok,
+  pg_get_functiondef(
+    to_regprocedure('public.az_create_order(bigint,public.az_order_type,text[],date,boolean,text)')
+  ) LIKE '%IF NOT public.az_is_staff() THEN RAISE EXCEPTION %' AS member_create_rpc_ok,
+  pg_get_functiondef(to_regprocedure('public.az_attach_order_image(bigint,text)'))
+    LIKE '%MEMBER chi duoc gan anh vao don do minh tao%' AS member_own_image_rpc_ok,
+  EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE schemaname='storage' AND tablename='objects'
+      AND policyname='az_order_upload_v1' AND with_check LIKE '%az_is_staff()%'
+  ) AS member_upload_policy_ok;
