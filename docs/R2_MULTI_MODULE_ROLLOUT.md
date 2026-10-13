@@ -43,3 +43,23 @@ Paths beginning `r2:` are read through the authenticated R2 proxy. All other pat
 ### Important
 - R2 objects are intentionally not auto-deleted on a failed RPC because they may be linked to business data. Manual orphan cleanup can be developed once schema is finalized.
 - The R2 API does not replace or modify live invoice/order/image-library APIs.
+
+## Live Supabase audit — 13/10/2026
+
+From read-only SQL result supplied by owner:
+
+| Requested function | Found in live public schema |
+|---|---|
+| az_return_finalize_direct(bigint,text) | YES — verifies storage.objects and photo freshness |
+| az_pattern_house_entry_create | NO |
+| az_pattern_customer_entry_create | NO |
+| az_stock_set_image | NO |
+| az_update_my_profile | NO |
+
+**Safety correction applied:** direct return receipt image upload stays on the original private Supabase bucket until a trusted, server-side R2 proof can preserve all anti-replay, freshness, debt-lock and duplicate-finalize protections. No production financial SQL is replaced.
+
+**BLOCKER:** Missing RPCs must be restored using verified business SQL based on live schema, not guessed from frontend calls or old repository migrations. Do not test uploads that depend on them: currently the frontend may upload a new R2 object before the related missing RPC rejects linkage, leaving an orphan. Existing order, packing, invoice and photo-library workflows remain unchanged.
+
+**Additional hardening:** generic R2 viewing is now allowed only for the object's uploader or authorized users with a corresponding database link. File possession alone does not grant access.
+
+**Next action:** run `npm run typecheck` and `npm run build:vinext` locally and provide output. Then inspect missing RPC dependencies using read-only SQL, restore one verified RPC at a time with backward compatibility. Do not execute actual stock/returns/pattern financial operations on Preview while sharing a production database.
