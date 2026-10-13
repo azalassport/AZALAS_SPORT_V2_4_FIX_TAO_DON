@@ -1,5 +1,6 @@
 "use client";
 
+import { R2_AVATAR_PROFILE_READY, R2_SQL_BLOCKED_MESSAGE } from "@/lib/azalas/r2-rollout-gates";
 import {
   Camera,
   CheckCircle2,
@@ -145,6 +146,7 @@ export default function PersonalAccount() {
       return;
     }
 
+    if (avatarFile && !R2_AVATAR_PROFILE_READY) { setErr(R2_SQL_BLOCKED_MESSAGE); return; }
     setBusy(true);
     setErr("");
     setOk("");
