@@ -93,3 +93,12 @@ The owner supplied SQL 41 CSV showing **both** stock RPC signatures already exis
 Their definitions match the intended SQL 40 logic (manager gate, internal-code upsert, nonnegative stock checks, row lock, movement log for nonzero delta). **SQL 40 should NOT be run again**; its STOP guard worked as intended. No stock function replacement is required.
 
 Outstanding: confirm SQL 39 successful creation of the two pattern-entry RPCs and SQL 37 functions, and verify Preview builds and R2 upload/read before enabling remaining write gates. Production image flows remain unchanged.
+
+## Update: SQL 39 successful (owner confirmed 13/10/2026)
+- Both pattern creation functions were installed successfully in the shared Supabase project. This is installation confirmation, **not** an end-to-end transaction test.
+- Live SQL 41 already confirmed both stock upsert/quantity RPCs exist and match intended semantics. Do not rerun SQL 40.
+- Preview code now passes SQL 37's `p_display_name,p_phone,p_address,p_avatar_path` signature in the old account form and preserves the profile address.
+- Preview pattern progress/customer views read independent `pattern_jobs.delivery_date` for standalone customer-made pattern jobs, without modifying production `az_pattern_progress()`.
+- Pattern creation **write gate is now limited to** `azalas-fabric-r2-azalas-sport-full.azalassport.workers.dev` and shows an explicit warning/confirmation before creating real PNR/customer-pattern records. The warning matters: Preview uses the Production database. Do not save test records unless expressly approved by the owner. Capture-only uploads write files to R2; these are not database records.
+- Stock image and avatar R2 write gates stay CLOSED because new paths in their shared database rows could break image rendering on current Production app. Existing order, pack, invoice and image-library upload flows remain unchanged.
+- No TypeScript/Vinext build has yet been run for these new source edits; run checks before redeploying Preview. No merge into main.
