@@ -84,3 +84,12 @@ Direct returns still upload to the old Supabase private bucket, matching the dep
 - `sql/40_R2_RESTORE_STOCK_OPERATIONS_SAFE.sql.txt` — restores `az_stock_upsert_product` and `az_stock_set_quantity` from existing app migration SQL 04 with live stock constraints. No stock entries change merely by installing functions.
 
 **Do not run these on an unconfirmed Supabase project.** The Preview shares the Production database. Both SQL files refuse to overwrite existing RPC signatures and run inside a transaction. The R2 rollout gates remain closed until the user sends the SQL result and the workflows are checked. SQL 39 cannot prove that an R2 object exists within PostgreSQL; Cloudflare's authenticated upload creates the object and the SQL validates owner/path only. A server-side file registry is needed for stronger cryptographic upload verification before high-stakes workflows.
+
+## SQL 41 live inventory RPC result
+The owner supplied SQL 41 CSV showing **both** stock RPC signatures already exist:
+- `public.az_stock_upsert_product(text,text,text,text,text,text,text)`
+- `public.az_stock_set_quantity(bigint,bigint,bigint,text)`
+
+Their definitions match the intended SQL 40 logic (manager gate, internal-code upsert, nonnegative stock checks, row lock, movement log for nonzero delta). **SQL 40 should NOT be run again**; its STOP guard worked as intended. No stock function replacement is required.
+
+Outstanding: confirm SQL 39 successful creation of the two pattern-entry RPCs and SQL 37 functions, and verify Preview builds and R2 upload/read before enabling remaining write gates. Production image flows remain unchanged.
