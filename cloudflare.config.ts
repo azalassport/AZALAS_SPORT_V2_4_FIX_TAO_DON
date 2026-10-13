@@ -1,13 +1,13 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
+  accountId: "d3b0ff95493c448c5f94b9be4da14469",
   worker: defineWorker({
     name: "azalas-sport-full",
     entrypoint: "vinext/server/fetch-handler",
     compatibilityDate: "2026-10-06",
     compatibilityFlags: ["nodejs_compat"],
     assets: { notFoundHandling: "none" },
-    previews: {},
     env: {
       ASSETS: bindings.assets(),
       AZALAS_IMAGES: bindings.r2({ name: "azalas-images" }),
