@@ -30,7 +30,7 @@ async function auth() {
   const { data: profile, error: pe } = await sb.from("az_profiles")
     .select("role,is_active").eq("id", user.id).maybeSingle();
   if (pe || !profile?.is_active || !["OWNER","ADMIN","MEMBER"].includes(profile.role)) return null;
-  return { user, role: String(profile.role) };
+  return { sb, user, role: String(profile.role) };
 }
 async function r2Bucket(): Promise<R2Bucket | undefined> {
   // Dynamic import prevents Node-side Next/Vinext build from importing worker module.
@@ -77,6 +77,28 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// An authenticated user may view their own uploaded draft. Other users need
+// a database reference to the R2 file; possession of a guessed UUID is not enough.
+async function isLinked(scope: Scope, path: string, sb: Awaited<ReturnType<typeof createClient>>) {
+  const query = async (table: string, column: string, array = false) => {
+    const base = sb.from(table).select("id").limit(1);
+    const { data, error } = await (array ? base.contains(column, [path]) : base.eq(column, path));
+    return !error && !!data?.length;
+  };
+  if (scope === "product") return query("az_product_variants", "image_path");
+  if (scope === "avatar") return query("az_profiles", "avatar_path");
+  if (scope === "supply") return query("supply_entries", "document_path");
+  if (scope === "return") return query("return_slips", "direct_image_path");
+  const checks = await Promise.all([
+    query("pattern_catalog", "image_path"),
+    query("pattern_notes", "image_path"),
+    query("pattern_job_images", "storage_path"),
+    query("pattern_entry_slips", "preview_image_path"),
+    query("pattern_entry_slips", "image_paths", true),
+  ]);
+  return checks.some(Boolean);
+}
+
 export async function GET(request: NextRequest) {
   const actor = await auth();
   if (!actor) return fail("Chưa đăng nhập", 401);
@@ -85,6 +107,8 @@ export async function GET(request: NextRequest) {
   if (!match) return fail("Đường dẫn R2 không hợp lệ");
   const scope = match[2] as Scope;
   if (!allowed(scope, actor.role, false)) return fail("Không có quyền đọc chứng từ", 403);
+  if (match[1] !== actor.user.id && !(await isLinked(scope,path,actor.sb)))
+    return fail("Ảnh chưa được liên kết với dữ liệu cho phép truy cập", 403);
   if (scope === "avatar" && match[4] === "pdf") return fail("Tệp không hợp lệ");
   const r2 = await r2Bucket();
   if (!r2) return fail("Chưa cấu hình R2", 503);
