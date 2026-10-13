@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {Boxes,HandCoins,Layers3,Link2,Palette,Printer,ReceiptText,Tag,WalletCards} from "lucide-react";
 import {createClient} from "@/lib/supabase/client";
+import {uploadR2File} from "@/lib/azalas/media-client";
 import {money,norm,vnToday} from "@/lib/azalas/format";
 import {Loading,Msg} from "@/components/ui";
 
@@ -191,10 +192,7 @@ export default function MaterialLedger({category,title,book}:{category:Category;
   }
 
   async function uploadClosePdf(file:File){
-    const {data:{user}}=await sb.auth.getUser();if(!user)throw new Error("Chưa đăng nhập");
-    const path=`${user.id}/${book||"IN"}/${closeForm.month}/${Date.now()}-${safeFile(file.name)}`;
-    const {error}=await sb.storage.from("az-supply-documents").upload(path,file,{upsert:false,contentType:file.type||"application/pdf"});
-    if(error)throw error;return path;
+    return uploadR2File(file,"supply");
   }
 
   async function saveMonthlyClose(){
@@ -209,7 +207,7 @@ export default function MaterialLedger({category,title,book}:{category:Category;
       const {error}=await sb.from("supply_entries").insert({partner_id:fixedPartner.id,category,entry_date:`${closeForm.month}-01`,item_name:"Chốt tháng",quantity:1,unit:"tháng",unit_price:amount,note:category==="IN"?(closeForm.note.trim()||null):null,entry_kind:"MONTHLY_CLOSE",document_path:documentPath,created_by:user?.id});
       if(error)throw error;
       setCloseForm({month:vnToday().slice(0,7),amount:"",note:"",file:null});setOk(`Đã chốt ${title}.`);await load();
-    }catch(e){if(documentPath)await sb.storage.from("az-supply-documents").remove([documentPath]);setErr(e instanceof Error?e.message:String(e));}
+    }catch(e){// Keep any orphaned R2 object on failed save; never delete an already-linked document.setErr(e instanceof Error?e.message:String(e));}
     finally{setBusy(false)}
   }
 
@@ -232,7 +230,8 @@ export default function MaterialLedger({category,title,book}:{category:Category;
     if(path.startsWith("r2:")){
       const {data:{session}}=await sb.auth.getSession();
       if(!session)return setErr("Hết phiên đăng nhập");
-      const response=await fetch("/api/azalas/fabric-files?path="+encodeURIComponent(path),{
+      const endpoint=path.includes("/vai/")?"/api/azalas/fabric-files":"/api/azalas/media";
+      const response=await fetch(endpoint+"?path="+encodeURIComponent(path),{
         headers:{Authorization:`Bearer ${session.access_token}`}
       });
       if(!response.ok){const result=await response.json().catch(()=>({error:"Không đọc được ảnh R2"}));return setErr(result.error||"Không đọc được ảnh R2")}
