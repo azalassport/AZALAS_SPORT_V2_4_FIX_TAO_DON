@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrl, uploadR2File } from "@/lib/azalas/media-client";
 import { ImageViewer, Loading, Msg } from "@/components/ui";
 import { dt, day, errorText, money } from "@/lib/azalas/format";
 
@@ -66,10 +67,8 @@ export default function ReturnDetail({ slipId }: { slipId: number }) {
       canSeeFinancialImage = profile?.role === "OWNER" || profile?.role === "ADMIN";
     }
     if (record.slip.direct_image_path && canSeeFinancialImage) {
-      const { data: signed, error: se } = await sb.storage.from("az-invoice-images")
-        .createSignedUrl(record.slip.direct_image_path, 3600);
-      if (se) setErr("Không mở được ảnh phiếu: " + se.message);
-      setSavedUrl(signed?.signedUrl || "");
+      try {setSavedUrl(await mediaUrl(sb,"az-invoice-images",record.slip.direct_image_path,3600));}
+      catch(e){setErr("Không mở được ảnh phiếu: "+(e instanceof Error?e.message:String(e)));setSavedUrl("");}
     } else setSavedUrl("");
     setLoading(false);
   }, [sb, slipId]);
@@ -113,10 +112,7 @@ export default function ReturnDetail({ slipId }: { slipId: number }) {
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
         b => b ? resolve(b) : reject(new Error("Không tạo được ảnh PNG")), "image/png",
       ));
-      const path = `${user.id}/returns/${slipId}/${crypto.randomUUID()}.png`;
-      const { error: uploadError } = await sb.storage.from("az-invoice-images")
-        .upload(path, blob, { contentType: "image/png", upsert: false });
-      if (uploadError) throw uploadError;
+      const path = await uploadR2File(blob,"return","phieu-tra.png");
       if (photoUrl) URL.revokeObjectURL(photoUrl);
       setPhotoUrl(URL.createObjectURL(blob));
       setPhotoBlob(blob);
