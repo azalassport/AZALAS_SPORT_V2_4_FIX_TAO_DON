@@ -106,7 +106,7 @@ export default function NewOrderForm() {
         ? await sb.rpc("az_order_customer_options")
         : await sb.from("az_customers").select("id,name,phone").order("id", { ascending: false }).limit(500);
       if (!active) return;
-      setRole(profile?.role ?? "");
+      setRole(profile?.role ?? "UNAVAILABLE");
       setCustomers((customerList ?? []) as Customer[]);
       setWarehouses(warehouseList ?? []);
       if (profileError || customerError || warehouseError) {
