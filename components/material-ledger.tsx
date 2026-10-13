@@ -11,7 +11,13 @@ type PrintBook="NHAT"|"TUNG";
 type EntryKind="NORMAL"|"MONTHLY_CLOSE"|"RETURN";
 type PaymentKind="PAYMENT"|"ADVANCE";
 
-type Partner={id:number;name:string;category:string;phone:string|null};
+type Partner={
+  id:number;
+  name:string;
+  category:string;
+  phone:string|null;
+  opening_debt:number;
+};
 type Entry={
   id:number;partner_id:number|null;entry_date:string;item_name:string;quantity:number;unit:string;
   unit_price:number;total:number;note:string|null;entry_kind:EntryKind;tree_count:number|null;
@@ -106,7 +112,7 @@ export default function MaterialLedger({category,title,book}:{category:Category;
       ? sb.from("supply_price_history").select("id,category,item_name,unit_price,effective_date").eq("category","DAY_KEO").order("effective_date",{ascending:false}).order("id",{ascending:false}).limit(500)
       : Promise.resolve({data:[] as PriceRow[],error:null});
     const [{data:p,error:pe},{data:e,error:ee},{data:tt,error:te},{data:pr,error:pre}]=await Promise.all([
-      sb.from("supply_partners").select("id,name,category,phone").eq("category",category).order("name"),
+      sb.from("supply_partners").select("id,name,category,phone,opening_debt").eq("category",category).order("name"),
       sb.from("supply_entries").select("id,partner_id,entry_date,item_name,quantity,unit,unit_price,total,note,entry_kind,tree_count,raw_quantity,depreciation,transport_fee,document_path").eq("category",category).is("deleted_at",null).order("entry_date",{ascending:false}).order("id",{ascending:false}).limit(1200),
       sb.from("supply_payments").select("id,partner_id,paid_at,method,amount,note,month_key,payment_kind").order("paid_at",{ascending:false}).order("id",{ascending:false}).limit(1200),
       pricePromise
@@ -286,14 +292,47 @@ export default function MaterialLedger({category,title,book}:{category:Category;
   }
 
   const fabricPartners=partners;
-  const selectedFabricEntries=entries.filter(e=>e.partner_id===partner);
-  const selectedFabricPayments=payments.filter(p=>p.partner_id===partner);
-  const entryEffective=(e:Entry)=>e.entry_kind==="RETURN"?-Math.abs(Number(e.total||0)):Number(e.total||0)+Number(e.transport_fee||0);
-  const fabricPartnerDebt=selectedFabricEntries.reduce((s,e)=>s+entryEffective(e),0)-selectedFabricPayments.reduce((s,p)=>s+Number(p.amount||0),0);
-  const fabricTotalDebt=fabricPartners.reduce((sum,p)=>{
-    const es=entries.filter(e=>e.partner_id===p.id).reduce((s,e)=>s+entryEffective(e),0);
-    const ps=payments.filter(x=>x.partner_id===p.id).reduce((s,x)=>s+Number(x.amount||0),0);return sum+Math.max(0,es-ps);
-  },0);
+
+const selectedFabricEntries=entries.filter(
+  e=>e.partner_id===partner
+);
+
+const selectedFabricPayments=payments.filter(
+  p=>p.partner_id===partner
+);
+
+const entryEffective=(e:Entry)=>
+  e.entry_kind==="RETURN"
+    ?-Math.abs(Number(e.total||0))
+    :Number(e.total||0)+Number(e.transport_fee||0);
+
+const selectedFabricPartner=fabricPartners.find(
+  p=>p.id===partner
+);
+
+const fabricPartnerDebt=
+  Number(selectedFabricPartner?.opening_debt||0)
+  +selectedFabricEntries.reduce(
+    (s,e)=>s+entryEffective(e),0
+  )
+  -selectedFabricPayments.reduce(
+    (s,p)=>s+Number(p.amount||0),0
+  );
+
+const fabricTotalDebt=fabricPartners.reduce((sum,p)=>{
+  const es=entries
+    .filter(e=>e.partner_id===p.id)
+    .reduce((s,e)=>s+entryEffective(e),0);
+
+  const ps=payments
+    .filter(x=>x.partner_id===p.id)
+    .reduce((s,x)=>s+Number(x.amount||0),0);
+
+  const currentDebt=
+    Number(p.opening_debt||0)+es-ps;
+
+  return sum+Math.max(0,currentDebt);
+},0);
 
   async function saveFabricPayment(){
     if(!partner)return setErr("Chọn Nhà Vải");const amount=Number(moneyDialog.amount);if(amount<=0||!moneyDialog.date)return setErr("Ngày hoặc số tiền không hợp lệ");
