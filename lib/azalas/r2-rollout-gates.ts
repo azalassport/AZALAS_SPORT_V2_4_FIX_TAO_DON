@@ -4,7 +4,11 @@
  * checked for R2 compatibility and verified against a test dataset.
  * Fabric is already enabled through its own verified endpoint.
  */
-export const R2_PATTERN_SLIP_READY = false;
+// Only the dedicated Preview hostname may create a test pattern slip.
+// Never enable these writes in main/production, even if this file is merged.
+export const R2_PATTERN_SLIP_READY =
+  typeof window !== "undefined" &&
+  window.location.hostname === "azalas-fabric-r2-azalas-sport-full.azalassport.workers.dev";
 export const R2_PRODUCT_LINK_READY = false;
 export const R2_AVATAR_PROFILE_READY = false;
 
