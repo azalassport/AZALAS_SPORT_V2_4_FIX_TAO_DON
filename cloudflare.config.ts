@@ -7,6 +7,7 @@ export default defineConfig({
     compatibilityDate: "2026-10-06",
     compatibilityFlags: ["nodejs_compat"],
     assets: { notFoundHandling: "none" },
+    previews: {},
     env: {
       ASSETS: bindings.assets(),
       AZALAS_IMAGES: bindings.r2({ name: "azalas-images" }),
