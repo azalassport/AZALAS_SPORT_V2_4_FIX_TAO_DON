@@ -1,4 +1,5 @@
 "use client";
+import {R2_PRODUCT_LINK_READY,R2_SQL_BLOCKED_MESSAGE} from "@/lib/azalas/r2-rollout-gates";
 import {useCallback,useEffect,useMemo,useState} from "react";
 import {createClient} from "@/lib/supabase/client";
 import {uploadR2File,mediaUrls} from "@/lib/azalas/media-client";
@@ -25,7 +26,7 @@ export default function StockBoard(){const sb=useMemo(()=>createClient(),[]);
  async function saveProduct(){setError("");setOk("");if(!form.internal_code.trim()||!form.sales_code.trim()||!form.product_name.trim())return setError("Cần mã nội bộ, mã bán hàng và tên sản phẩm.");setBusy(true);
   const {data,error:e}=await sb.rpc("az_stock_upsert_product",{p_internal_code:form.internal_code,p_sales_code:form.sales_code,p_product_name:form.product_name,p_color:form.color,p_size:form.size,p_brand:form.brand||null,p_pattern_code:form.pattern_code||null});setBusy(false);if(e)return setError(e.message);setChosen(Number(data));setOk(`Đã lưu biến thể #${data}. Cùng mã bán hàng có thể có nhiều màu/size.`);setForm(fresh());await load();}
  async function setStock(){setError("");setOk("");if(!chosen||!wh||!/^[0-9]+$/.test(qty))return setError("Chọn sản phẩm, kho và nhập tồn nguyên không âm.");setBusy(true);const {error:e}=await sb.rpc("az_stock_set_quantity",{p_variant_id:chosen,p_warehouse_id:wh,p_quantity:Number(qty),p_reason:reason||"NHAP_KHO_TEST"});setBusy(false);if(e)return setError(e.message);setOk("Đã lưu tồn kho và ghi lịch sử chênh lệch.");await load();}
- async function saveImage(){setError("");setOk("");if(!chosen||!imageFile)return setError("Chọn biến thể và một ảnh trước.");if(!["image/jpeg","image/png","image/webp"].includes(imageFile.type)||imageFile.size>8*1024*1024)return setError("Chỉ JPG/PNG/WEBP tối đa 8 MB.");setBusy(true);
+ async function saveImage(){setError("");setOk("");if(!R2_PRODUCT_LINK_READY)return setError(R2_SQL_BLOCKED_MESSAGE);if(!chosen||!imageFile)return setError("Chọn biến thể và một ảnh trước.");if(!["image/jpeg","image/png","image/webp"].includes(imageFile.type)||imageFile.size>8*1024*1024)return setError("Chỉ JPG/PNG/WEBP tối đa 8 MB.");setBusy(true);
   let path="";try{path=await uploadR2File(imageFile,"product")}catch(e){setBusy(false);return setError("Không lưu được ảnh lên R2: "+(e instanceof Error?e.message:String(e)));}
   const {error:link}=await sb.rpc("az_stock_set_image",{p_variant_id:chosen,p_path:path});setBusy(false);if(link)return setError("Ảnh đã upload nhưng chưa liên kết: "+link.message);setImageFile(null);setOk("Đã lưu ảnh sản phẩm vào danh mục.");await load();}
  const filtered=products.filter(p=>`${p.internal_code} ${p.sales_code} ${p.product_name} ${p.color} ${p.size}`.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().includes(filter.normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase()));
