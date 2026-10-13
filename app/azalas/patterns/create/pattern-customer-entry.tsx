@@ -104,6 +104,7 @@ export default function PatternCustomerEntry() {
       return setError("Chọn đủ ngày cắt, ngày giao, khách hàng, mã rập, nhà may và thợ cắt.");
     if (!form.sizeRange.trim()) return setError("Nhập size hoặc dải size của hàng khách đặt.");
     if (!quantity.value) return setError(quantity.error);
+    if (!window.confirm("CHÚ Ý: Preview đang dùng CHUNG database với app chính. Tạo Rập Khách đặt sẽ ghi dữ liệu thật. Bạn có đồng ý tiếp tục?")) return;
     setSewingPriceTouched(true);
     const priceError = rapSewingPriceError(form.sewingPrice);
     if (priceError) return setError(priceError);
