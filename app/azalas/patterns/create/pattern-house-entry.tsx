@@ -189,6 +189,7 @@ export default function PatternHouseEntry() {
     if (!showPreview || !previewPath) return setError("Hãy Xem trước → Chụp & lưu ảnh phiếu trước khi lập PNR.");
     if (!form.cutDate || !form.houseId || !form.cutterId || !form.warehouseId || !form.fabricId || !form.patternId || !files.length)
       return setError("Thiếu thông tin bắt buộc hoặc ảnh rập.");
+    if (!window.confirm("CHÚ Ý: Đây là Preview nhưng sử dụng CHUNG database với app chính. Tạo phiếu PNR này sẽ ghi dữ liệu thật. Bạn có xác nhận tạo phiếu không?")) return;
     setBusy(true); setError(""); setOk("");
     try {
       const { data: { user } } = await sb.auth.getUser();
