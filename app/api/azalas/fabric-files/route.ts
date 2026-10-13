@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
@@ -10,7 +9,12 @@ type Bucket = {
   get(key:string):Promise<R2File|null>;
   delete(key:string):Promise<void>;
 };
-const bucket = () => (env as unknown as {AZALAS_IMAGES?: Bucket}).AZALAS_IMAGES;
+// Resolve this runtime-only module lazily: next build evaluates route modules in Node,
+// where cloudflare:workers does not exist. Vinext resolves it inside workerd.
+async function bucket():Promise<Bucket|undefined>{
+  const {env}=await import("cloudflare:workers");
+  return (env as unknown as {AZALAS_IMAGES?:Bucket}).AZALAS_IMAGES;
+}
 const prefix="r2:";
 const MAX_BYTES=8*1024*1024;
 
@@ -31,7 +35,7 @@ function errorJson(message:string,status:number){
 export async function POST(request:NextRequest){
   const actor=await manager();
   if(!actor)return errorJson("Không có quyền lưu ảnh nhà vải",403);
-  const r2=bucket();
+  const r2=await bucket();
   if(!r2)return errorJson("Cloudflare R2 chưa được cấu hình",503);
   const form=await request.formData();
   const file=form.get("file");
@@ -46,7 +50,7 @@ export async function POST(request:NextRequest){
 export async function GET(request:NextRequest){
   const actor=await manager();
   if(!actor)return errorJson("Không có quyền xem ảnh nhà vải",403);
-  const r2=bucket();
+  const r2=await bucket();
   if(!r2)return errorJson("Cloudflare R2 chưa được cấu hình",503);
   const path=request.nextUrl.searchParams.get("path")||"";
   if(!path.startsWith(prefix)||!/^r2:[a-f0-9-]+\/vai\/[a-f0-9-]+\.png$/.test(path)){
@@ -67,7 +71,7 @@ export async function GET(request:NextRequest){
 export async function DELETE(request:NextRequest){
   const actor=await manager();
   if(!actor)return errorJson("Không có quyền xóa ảnh",403);
-  const r2=bucket();
+  const r2=await bucket();
   if(!r2)return errorJson("Cloudflare R2 chưa được cấu hình",503);
   const {path}=await request.json() as {path?:string};
   if(!path||!path.startsWith(prefix+actor.user.id+"/vai/")||
