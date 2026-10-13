@@ -11,6 +11,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrl, uploadR2File } from "@/lib/azalas/media-client";
 import { Loading, Msg } from "@/components/ui";
 
 type Role = "OWNER" | "ADMIN" | "MEMBER";
@@ -94,11 +95,7 @@ export default function PersonalAccount() {
     setProfile(next);
 
     if (next.avatar_path) {
-      const { data: signed } = await sb.storage
-        .from("az-avatars")
-        .createSignedUrl(next.avatar_path, 3600);
-
-      setAvatarUrl(signed?.signedUrl || "");
+      setAvatarUrl(await mediaUrl(sb,"az-avatars",next.avatar_path,3600));
     } else {
       setAvatarUrl("");
     }
@@ -162,26 +159,7 @@ export default function PersonalAccount() {
       if (!user) throw new Error("Hết phiên đăng nhập.");
 
       if (avatarFile) {
-        const rawExt =
-          avatarFile.name.split(".").pop()?.toLowerCase().replace(/[^a-z0-9]/g, "") ||
-          "jpg";
-        const ext = ["jpg", "jpeg", "png", "webp"].includes(rawExt)
-          ? rawExt
-          : "jpg";
-
-        const path = `${user.id}/avatar-${Date.now()}.${ext}`;
-
-        const { error: uploadError } = await sb.storage
-          .from("az-avatars")
-          .upload(path, avatarFile, {
-            cacheControl: "3600",
-            upsert: false,
-            contentType: avatarFile.type || undefined,
-          });
-
-        if (uploadError) throw new Error(uploadError.message);
-
-        nextAvatarPath = path;
+        nextAvatarPath = await uploadR2File(avatarFile,"avatar");
       }
 
       const { error: updateError } = await sb.rpc("az_update_my_profile", {
@@ -193,13 +171,7 @@ export default function PersonalAccount() {
 
       if (updateError) throw new Error(updateError.message);
 
-      if (
-        avatarFile &&
-        profile.avatar_path &&
-        profile.avatar_path !== nextAvatarPath
-      ) {
-        await sb.storage.from("az-avatars").remove([profile.avatar_path]);
-      }
+      // Preserve old Supabase Storage avatars for existing clients.
 
       setAvatarFile(null);
       if (avatarPreview) {
