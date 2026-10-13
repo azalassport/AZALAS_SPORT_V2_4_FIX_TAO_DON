@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { FileImage, ImagePlus, Plus, Search, Tag } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { uploadR2File, mediaUrls } from "@/lib/azalas/media-client";
 import { ImageViewer, Msg } from "@/components/ui";
 import { norm, money } from "@/lib/azalas/format";
 
@@ -33,8 +34,7 @@ export default function PatternCatalog() {
     setNotes((n || []) as Note[]);
     const all = [...(c || []).map(x => x.image_path), ...(n || []).map(x => x.image_path)].filter(Boolean) as string[];
     if (all.length) {
-      const { data } = await sb.storage.from("az-pattern-images").createSignedUrls(all, 3600);
-      setUrls(Object.fromEntries(all.map((path, i) => [path, data?.[i]?.signedUrl || ""])));
+      setUrls(await mediaUrls(sb, "az-pattern-images", all, 3600));
     }
   }, [sb]);
 
@@ -57,9 +57,8 @@ export default function PatternCatalog() {
       if (!image.type.startsWith("image/") || image.size > 8 * 1024 * 1024) { setBusy(false); return setErr("Ảnh phải nhỏ hơn 8MB"); }
       const { data: { user } } = await sb.auth.getUser();
       if (!user) { setBusy(false); return setErr("Hết phiên đăng nhập"); }
-      path = `${user.id}/catalog/${selected}/${crypto.randomUUID()}.${image.name.split(".").pop() || "jpg"}`;
-      const { error } = await sb.storage.from("az-pattern-images").upload(path, image, { contentType: image.type, upsert: false });
-      if (error) { setBusy(false); return setErr(error.message); }
+      try { path = await uploadR2File(image, "pattern"); }
+      catch(e) { setBusy(false); return setErr(e instanceof Error ? e.message : String(e)); }
     }
     const { data: { user } } = await sb.auth.getUser();
     const { error } = await sb.from("pattern_notes").insert({ pattern_id: selected, note, image_path: path, created_by: user?.id });
