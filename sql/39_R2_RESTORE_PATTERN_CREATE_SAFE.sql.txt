@@ -1,0 +1,382 @@
+-- AZALAS SPORT | R2 RESTORE CREATE PATTERN RPCs (HANG NHA + KHACH DAT)
+-- Based on actual SQL 38 schema/constraints exported 13/10/2026 and current UI payload.
+-- ADDITIVE ONLY. Creates missing functions; adds nullable delivery_date for standalone
+-- customer pattern jobs (NO order_group needed). NO data reset, no stock or debt updates.
+-- NOT tested against running DB yet. Keep preview WRITE gates CLOSED until verified.
+BEGIN;
+
+DO $preflight$
+BEGIN
+  IF to_regprocedure('public.az_pattern_house_entry_create(uuid,jsonb)') IS NOT NULL OR
+     to_regprocedure('public.az_pattern_customer_entry_create(uuid,jsonb)') IS NOT NULL
+  THEN RAISE EXCEPTION 'STOP: ham tao rap da ton tai; khong ghi de'; END IF;
+  IF to_regclass('public.pattern_entry_slips') IS NULL OR
+     to_regclass('public.pattern_jobs') IS NULL OR
+     to_regclass('public.pattern_job_size_plans') IS NULL OR
+     to_regclass('public.pattern_job_images') IS NULL OR
+     to_regclass('public.pattern_catalog') IS NULL OR
+     to_regclass('public.sewing_houses') IS NULL OR
+     to_regclass('public.cutters') IS NULL OR
+     to_regclass('public.az_warehouses') IS NULL OR
+     to_regclass('public.pattern_fabrics') IS NULL OR
+     to_regprocedure('public.az_is_manager()') IS NULL
+  THEN RAISE EXCEPTION 'STOP: thieu CORE RAP; khong cai dat'; END IF;
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='pattern_entry_slips'
+    AND column_name='image_paths' AND data_type='jsonb'
+  ) THEN RAISE EXCEPTION 'STOP: image_paths khong phai JSONB'; END IF;
+END
+$preflight$;
+
+-- Khach dat rap khong co order_group: luu ngay giao rieng, khong tao don hang.
+ALTER TABLE public.pattern_jobs ADD COLUMN IF NOT EXISTS delivery_date date;
+
+CREATE FUNCTION public.az_pattern_house_entry_create(
+  p_request_key uuid, p_data jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_slip_id bigint; v_first_job bigint; v_job_id bigint;
+  v_slip_code text; v_mam_code text;
+  v_cut date; v_house bigint; v_cutter bigint; v_wh bigint; v_fabric bigint;
+  v_models jsonb; v_images jsonb; v_model jsonb; v_colors jsonb; v_sizes jsonb; v_ratios jsonb;
+  v_color_obj jsonb; v_image_obj jsonb;
+  v_path text; v_preview text; v_color text; v_brand text; v_code text; v_product text;
+  v_size text; v_ratio_text text; v_size_range text; v_mode text;
+  v_pattern_id bigint; v_price numeric; v_layers integer; v_ratio integer;
+  v_model_qty bigint; v_total bigint; v_check_total bigint := 0; v_layer_count bigint;
+  v_i integer; v_key text; v_price_text text;
+  v_seen_paths text[] := ARRAY[]::text[]; v_seen_colors text[];
+  v_seen_keys text[] := ARRAY[]::text[]; v_seen_sizes text[];
+  v_internal text; v_sales text;
+BEGIN
+  IF v_uid IS NULL OR NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Chi OWNER/ADMIN duoc lap phieu PNR';
+  END IF;
+  IF p_request_key IS NULL OR p_data IS NULL OR jsonb_typeof(p_data)<>'object'
+  THEN RAISE EXCEPTION 'Thong tin phieu khong hop le'; END IF;
+
+  -- Make retries idempotent, and share a single transaction for all models.
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('az-pnr:'||p_request_key::text,0)
+  );
+  SELECT id,slip_code,mam_code INTO v_slip_id,v_slip_code,v_mam_code
+    FROM public.pattern_entry_slips WHERE request_key=p_request_key AND created_by=v_uid;
+  IF FOUND THEN
+    RETURN jsonb_build_object('slip_code',v_slip_code,'mam_code',v_mam_code,'already_created',true);
+  END IF;
+  IF EXISTS(SELECT 1 FROM public.pattern_entry_slips WHERE request_key=p_request_key) THEN
+    RAISE EXCEPTION 'Ma yeu cau da duoc su dung boi tai khoan khac';
+  END IF;
+
+  v_cut := nullif(p_data->>'cut_date','')::date;
+  v_house := nullif(p_data->>'sewing_house_id','')::bigint;
+  v_cutter := nullif(p_data->>'cutter_id','')::bigint;
+  v_wh := nullif(p_data->>'warehouse_id','')::bigint;
+  v_fabric := nullif(p_data->>'fabric_id','')::bigint;
+  v_mode := p_data->>'color_mode';
+  v_total := nullif(p_data->>'total','')::bigint;
+  v_preview := p_data->>'preview_image_path';
+  v_models := p_data->'models'; v_images := p_data->'image_paths';
+
+  IF v_cut IS NULL OR v_house IS NULL OR v_cutter IS NULL
+     OR v_wh IS NULL OR v_fabric IS NULL
+     OR v_mode NOT IN ('common','perModel')
+     OR v_total IS NULL OR v_total<1 OR v_total>100000000
+     OR v_preview IS NULL
+  THEN RAISE EXCEPTION 'Ngay cat, nha may, tho cat, kho, vai hoac tong khong hop le'; END IF;
+
+  IF NOT EXISTS(SELECT 1 FROM public.sewing_houses WHERE id=v_house AND is_active)
+     OR NOT EXISTS(SELECT 1 FROM public.cutters WHERE id=v_cutter AND is_active)
+     OR NOT EXISTS(SELECT 1 FROM public.az_warehouses WHERE id=v_wh AND is_active)
+     OR NOT EXISTS(SELECT 1 FROM public.pattern_fabrics WHERE id=v_fabric AND is_active)
+  THEN RAISE EXCEPTION 'Danh muc nha may/tho cat/kho/vai khong ton tai hoac da khoa'; END IF;
+
+  IF jsonb_typeof(v_models)<>'array' OR jsonb_array_length(v_models) NOT BETWEEN 1 AND 30
+    OR jsonb_typeof(v_images)<>'array' OR jsonb_array_length(v_images) NOT BETWEEN 1 AND 12
+  THEN RAISE EXCEPTION 'Moi PNR can 1-30 mau va 1-12 anh'; END IF;
+
+  -- The slip capture and all user-supplied images must belong to the uploader.
+  IF v_preview ~ '^r2:' THEN
+    IF v_preview !~ ('^r2:'||v_uid::text||'/pattern/[0-9a-f-]{36}[.](png|jpg|webp)$') THEN
+      RAISE EXCEPTION 'Anh PNR R2 sai duong dan'; END IF;
+  ELSIF split_part(v_preview,'/',1)<>v_uid::text
+       OR NOT EXISTS(SELECT 1 FROM storage.objects
+           WHERE bucket_id='az-pattern-images' AND name=v_preview) THEN
+      RAISE EXCEPTION 'Anh PNR chua luu hop le tren Supabase Storage';
+  END IF;
+
+  FOR v_image_obj IN SELECT value FROM jsonb_array_elements(v_images) LOOP
+    IF jsonb_typeof(v_image_obj)<>'string' THEN
+      RAISE EXCEPTION 'Danh sach anh khong hop le'; END IF;
+    v_path := v_image_obj #>> '{}';
+    IF v_path=ANY(v_seen_paths) OR v_path=v_preview THEN
+      RAISE EXCEPTION 'Anh bi trung trong phieu'; END IF;
+    v_seen_paths := array_append(v_seen_paths,v_path);
+    IF v_path ~ '^r2:' THEN
+      IF v_path !~ ('^r2:'||v_uid::text||'/pattern/[0-9a-f-]{36}[.](png|jpg|webp)$') THEN
+        RAISE EXCEPTION 'Anh R2 khong thuoc tai khoan'; END IF;
+    ELSIF split_part(v_path,'/',1)<>v_uid::text
+       OR NOT EXISTS(SELECT 1 FROM storage.objects
+           WHERE bucket_id='az-pattern-images' AND name=v_path) THEN
+      RAISE EXCEPTION 'Anh phieu khong ton tai tren Supabase Storage';
+    END IF;
+  END LOOP;
+
+  INSERT INTO public.pattern_entry_slips(
+    request_key,slip_code,mam_code,color_mode,cut_date,
+    sewing_house_id,cutter_id,expected_warehouse_id,fabric_id,
+    preview_image_path,image_paths,note,planned_qty,created_by
+  ) VALUES (
+    p_request_key,NULL,NULL,v_mode,v_cut,v_house,v_cutter,v_wh,v_fabric,
+    v_preview,v_images,nullif(btrim(p_data->>'note'),''),v_total::integer,v_uid
+  ) RETURNING id INTO v_slip_id;
+  v_slip_code := 'PNR'||to_char(
+    clock_timestamp() AT TIME ZONE 'Asia/Ho_Chi_Minh','DDMMYYYY'
+  )||lpad(v_slip_id::text,6,'0');
+  v_mam_code := 'MAM'||lpad(v_slip_id::text,8,'0');
+  UPDATE public.pattern_entry_slips
+    SET slip_code=v_slip_code,mam_code=v_mam_code WHERE id=v_slip_id;
+
+  FOR v_model IN SELECT value FROM jsonb_array_elements(v_models) LOOP
+    IF jsonb_typeof(v_model)<>'object' THEN RAISE EXCEPTION 'Mau Rập sai dinh dang'; END IF;
+    v_pattern_id := nullif(v_model->>'pattern_id','')::bigint;
+    v_brand := btrim(coalesce(v_model->>'brand',''));
+    v_key := coalesce(v_pattern_id::text,'')||'/'||upper(v_brand);
+    IF v_brand='' OR length(v_brand)>120 OR v_key=ANY(v_seen_keys)
+    THEN RAISE EXCEPTION 'Hieu rong, trung hieu hoac qua dai'; END IF;
+    v_seen_keys := array_append(v_seen_keys,v_key);
+    SELECT code,product_name INTO v_code,v_product
+      FROM public.pattern_catalog WHERE id=v_pattern_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'Ma rap khong ton tai'; END IF;
+    v_price_text:=v_model->>'sewing_price';
+    v_price:=nullif(v_price_text,'')::numeric;
+    IF v_price IS NULL OR v_price<=0 OR v_price>1000000000
+    THEN RAISE EXCEPTION 'Don gia nha may bat buoc va phai >0'; END IF;
+    v_internal := nullif(btrim(v_model->>'internal_code'),'');
+    v_sales := nullif(btrim(v_model->>'sales_code'),'');
+    v_sizes := v_model->'sizes'; v_ratios := v_model->'ratios'; v_colors := v_model->'colors';
+    IF jsonb_typeof(v_sizes)<>'array' OR jsonb_array_length(v_sizes) NOT BETWEEN 1 AND 11
+      OR jsonb_typeof(v_ratios)<>'array'
+      OR jsonb_array_length(v_ratios)<>jsonb_array_length(v_sizes)
+      OR jsonb_typeof(v_colors)<>'array' OR jsonb_array_length(v_colors) NOT BETWEEN 1 AND 60
+    THEN RAISE EXCEPTION 'Size/ti le/mau khong hop le'; END IF;
+
+    v_seen_sizes:=ARRAY[]::text[]; v_ratio_text:='';
+    FOR v_i IN 0..jsonb_array_length(v_sizes)-1 LOOP
+      IF jsonb_typeof(v_sizes->v_i)<>'string'
+        OR jsonb_typeof(v_ratios->v_i)<>'number'
+      THEN RAISE EXCEPTION 'Size/ti le phai la chuoi va so'; END IF;
+      v_size:=v_sizes->>v_i;
+      v_ratio:=(v_ratios->>v_i)::integer;
+      IF v_size NOT IN ('S','M','L','XL','2X','3X','4X','5X','6X','7X','8X')
+        OR v_size=ANY(v_seen_sizes) OR v_ratio NOT BETWEEN 0 AND 9
+      THEN RAISE EXCEPTION 'Ti le size khong hop le'; END IF;
+      v_seen_sizes:=array_append(v_seen_sizes,v_size);
+      v_ratio_text:=v_ratio_text||v_ratio::text;
+    END LOOP;
+    v_size_range:=v_sizes->>0;
+    IF jsonb_array_length(v_sizes)>1 THEN
+      v_size_range:=v_size_range||'-'||(v_sizes->>(jsonb_array_length(v_sizes)-1));
+    END IF;
+
+    -- Calculate independent authoritative totals. A zero-ratio size is SKIPPED;
+    -- database constraint pattern_job_size_plans_ratio_check requires ratio 1..9.
+    v_model_qty:=0; v_layer_count:=0; v_seen_colors:=ARRAY[]::text[];
+    FOR v_color_obj IN SELECT value FROM jsonb_array_elements(v_colors) LOOP
+      IF jsonb_typeof(v_color_obj)<>'object' THEN RAISE EXCEPTION 'Mau sai dinh dang'; END IF;
+      v_color:=upper(btrim(coalesce(v_color_obj->>'color','')));
+      v_layers:=nullif(v_color_obj->>'layers','')::integer;
+      IF v_color='' OR length(v_color)>80 OR v_color=ANY(v_seen_colors)
+        OR v_layers IS NULL OR v_layers<1 OR v_layers>1000000
+      THEN RAISE EXCEPTION 'Mau bi trung hoac so lop khong hop le'; END IF;
+      v_seen_colors:=array_append(v_seen_colors,v_color);
+      v_layer_count:=v_layer_count+v_layers;
+      FOR v_i IN 0..jsonb_array_length(v_ratios)-1 LOOP
+        v_ratio:=(v_ratios->>v_i)::integer;
+        IF v_ratio>0 THEN
+          v_model_qty:=v_model_qty+v_layers::bigint*v_ratio::bigint;
+        END IF;
+      END LOOP;
+    END LOOP;
+    IF v_model_qty<1 OR v_model_qty>100000000 OR v_layer_count>100000000
+    THEN RAISE EXCEPTION 'So luong mau vuot gioi han hoac bang 0'; END IF;
+    v_check_total:=v_check_total+v_model_qty;
+
+    INSERT INTO public.pattern_jobs(
+      order_type,customer_id,order_group_id,pattern_id,pattern_code,product_name,
+      brand,size_range,size_ratio,layer_count,planned_qty,cut_date,
+      sewing_house_id,cutter_id,sewing_price,note,created_by,
+      entry_slip_id,expected_warehouse_id
+    ) VALUES(
+      'THUONG'::public.az_order_type,NULL,NULL,v_pattern_id,v_code,v_product,
+      v_brand,v_size_range,v_ratio_text,v_layer_count::integer,v_model_qty::integer,
+      v_cut,v_house,v_cutter,v_price,nullif(btrim(p_data->>'note'),''),v_uid,
+      v_slip_id,v_wh
+    ) RETURNING id INTO v_job_id;
+    UPDATE public.pattern_jobs
+      SET job_code='RAP'||lpad(v_job_id::text,7,'0') WHERE id=v_job_id;
+    IF v_first_job IS NULL THEN v_first_job:=v_job_id; END IF;
+
+    FOR v_color_obj IN SELECT value FROM jsonb_array_elements(v_colors) LOOP
+      v_color:=upper(btrim(v_color_obj->>'color'));
+      v_layers:=(v_color_obj->>'layers')::integer;
+      FOR v_i IN 0..jsonb_array_length(v_ratios)-1 LOOP
+        v_ratio:=(v_ratios->>v_i)::integer;
+        IF v_ratio>0 THEN
+          INSERT INTO public.pattern_job_size_plans(
+            job_id,color,size,layers,ratio,planned_qty,internal_code,sales_code
+          ) VALUES (
+            v_job_id,v_color,v_sizes->>v_i,v_layers,v_ratio,
+            v_layers*v_ratio,v_internal,v_sales
+          );
+        END IF;
+      END LOOP;
+    END LOOP;
+  END LOOP;
+
+  IF v_check_total<>v_total THEN
+    RAISE EXCEPTION 'Tong mau/size (%) khong khop tong phieu (%)',v_check_total,v_total;
+  END IF;
+  -- Attach slip images ONCE to the first job (storage_path is UNIQUE),
+  -- while the single shared slip keeps the full JSON image list for OWNER/ADMIN.
+  FOR v_image_obj IN SELECT value FROM jsonb_array_elements(v_images) LOOP
+    INSERT INTO public.pattern_job_images(job_id,storage_path,uploaded_by)
+    VALUES(v_first_job,v_image_obj #>> '{}',v_uid);
+  END LOOP;
+
+  RETURN jsonb_build_object(
+    'slip_code',v_slip_code,'mam_code',v_mam_code,'already_created',false
+  );
+END
+$fn$;
+
+-- Customer-made patterns do NOT create an order_group or invoice.
+-- Upload paths are idempotent via UNIQUE pattern_job_images.storage_path.
+CREATE FUNCTION public.az_pattern_customer_entry_create(
+  p_request_key uuid,p_data jsonb
+) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+DECLARE
+  v_uid uuid := auth.uid();
+  v_cut date; v_delivery date; v_customer bigint; v_pattern bigint; v_house bigint; v_cutter bigint;
+  v_cat_code text; v_product_name text; v_brand text; v_size_range text; v_size_ratio text;
+  v_images jsonb; v_image_obj jsonb; v_path text; v_first_path text;
+  v_seen text[] := ARRAY[]::text[];
+  v_expr text; v_raw text; v_qty bigint; v_layers bigint := 1; v_expected bigint;
+  v_price numeric; v_job_id bigint; v_job_code text; v_existing bigint;
+BEGIN
+  IF v_uid IS NULL OR NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Chi OWNER/ADMIN duoc tao rap khach dat';
+  END IF;
+  IF p_request_key IS NULL OR p_data IS NULL OR jsonb_typeof(p_data)<>'object' THEN
+    RAISE EXCEPTION 'Thong tin rap khach dat khong hop le';
+  END IF;
+  v_cut:=nullif(p_data->>'cut_date','')::date;
+  v_delivery:=nullif(p_data->>'delivery_date','')::date;
+  v_customer:=nullif(p_data->>'customer_id','')::bigint;
+  v_pattern:=nullif(p_data->>'pattern_id','')::bigint;
+  v_house:=nullif(p_data->>'sewing_house_id','')::bigint;
+  v_cutter:=nullif(p_data->>'cutter_id','')::bigint;
+  v_brand:=nullif(btrim(p_data->>'brand'),'');
+  v_size_range:=nullif(btrim(p_data->>'size_range'),'');
+  v_size_ratio:=nullif(btrim(p_data->>'size_ratio'),'');
+  v_price:=nullif(p_data->>'sewing_price','')::numeric;
+  v_images:=p_data->'image_paths';
+  IF v_cut IS NULL OR v_delivery IS NULL OR v_customer IS NULL OR
+     v_pattern IS NULL OR v_house IS NULL OR v_cutter IS NULL OR v_size_range IS NULL OR
+     v_price IS NULL OR v_price<=0 OR v_price>1000000000
+  THEN RAISE EXCEPTION 'Thong tin ngay cat/giao, khach, rap, don gia chua day du'; END IF;
+  IF NOT EXISTS(SELECT 1 FROM public.az_customers WHERE id=v_customer)
+    OR NOT EXISTS(SELECT 1 FROM public.sewing_houses WHERE id=v_house AND is_active)
+    OR NOT EXISTS(SELECT 1 FROM public.cutters WHERE id=v_cutter AND is_active)
+  THEN RAISE EXCEPTION 'Khach/nha may/tho cat khong ton tai'; END IF;
+  SELECT code,product_name INTO v_cat_code,v_product_name
+    FROM public.pattern_catalog WHERE id=v_pattern;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Ma rap khong ton tai'; END IF;
+  IF jsonb_typeof(v_images)<>'array' OR jsonb_array_length(v_images) NOT BETWEEN 1 AND 12
+  THEN RAISE EXCEPTION 'Can 1-12 anh'; END IF;
+
+  v_first_path:=v_images->>0;
+  PERFORM pg_catalog.pg_advisory_xact_lock(
+    pg_catalog.hashtextextended('az-customer-rap:'||v_first_path,0)
+  );
+  -- Distinct R2 file path is persisted as a unique row, preventing double submission.
+  SELECT i.job_id INTO v_existing FROM public.pattern_job_images i
+  JOIN public.pattern_jobs j ON j.id=i.job_id
+  WHERE i.storage_path=v_first_path AND j.created_by=v_uid LIMIT 1;
+  IF FOUND THEN
+    SELECT job_code INTO v_job_code FROM public.pattern_jobs WHERE id=v_existing;
+    RETURN jsonb_build_object('job_code',v_job_code,'already_created',true);
+  END IF;
+
+  FOR v_image_obj IN SELECT value FROM jsonb_array_elements(v_images) LOOP
+    IF jsonb_typeof(v_image_obj)<>'string' THEN RAISE EXCEPTION 'Anh sai dinh dang'; END IF;
+    v_path:=v_image_obj #>> '{}';
+    IF v_path=ANY(v_seen) THEN RAISE EXCEPTION 'Anh bi lap lai'; END IF;
+    v_seen:=array_append(v_seen,v_path);
+    IF v_path ~ '^r2:' THEN
+      IF v_path !~ ('^r2:'||v_uid::text||'/pattern/[0-9a-f-]{36}[.](png|jpg|webp)$')
+      THEN RAISE EXCEPTION 'Duong dan R2 khong hop le'; END IF;
+    ELSIF split_part(v_path,'/',1)<>v_uid::text OR
+      NOT EXISTS(SELECT 1 FROM storage.objects
+        WHERE bucket_id='az-pattern-images' AND name=v_path)
+    THEN RAISE EXCEPTION 'Anh Supabase chua duoc upload'; END IF;
+    IF EXISTS(SELECT 1 FROM public.pattern_job_images WHERE storage_path=v_path)
+    THEN RAISE EXCEPTION 'Anh da thuoc ve rap khac'; END IF;
+  END LOOP;
+
+  v_expr:=lower(regexp_replace(coalesce(p_data->>'quantity_expression',''),'[[:space:]]+','','g'));
+  v_expr:=replace(replace(v_expr,'×','x'),'*','x');
+  IF v_expr ~ '^[1-9][0-9]{0,5}x[1-9][0-9]{0,5}(=[1-9][0-9]{0,8})?$' THEN
+    v_layers:=split_part(v_expr,'x',1)::bigint;
+    v_raw:=split_part(split_part(v_expr,'x',2),'=',1);
+    v_qty:=v_layers*v_raw::bigint;
+    IF position('=' in v_expr)>0 THEN
+      v_expected:=split_part(v_expr,'=',2)::bigint;
+      IF v_qty<>v_expected THEN RAISE EXCEPTION 'Tong sau dau = khong dung'; END IF;
+    END IF;
+  ELSIF v_expr ~ '^(x=|=)?[1-9][0-9]{0,8}$' THEN
+    v_qty:=regexp_replace(v_expr,'^(x=|=)','')::bigint;
+  ELSE
+    RAISE EXCEPTION 'Nhap so luong dang 100x7=700 hoac x=700';
+  END IF;
+  IF v_qty<1 OR v_qty>100000000 OR v_layers>2147483647
+  THEN RAISE EXCEPTION 'So luong rap vuot gioi han'; END IF;
+
+  INSERT INTO public.pattern_jobs(
+    order_type,customer_id,order_group_id,pattern_id,pattern_code,product_name,
+    brand,size_range,size_ratio,layer_count,planned_qty,cut_date,delivery_date,
+    sewing_house_id,cutter_id,sewing_price,note,created_by
+  ) VALUES(
+    'KHACH_DAT'::public.az_order_type,v_customer,NULL,v_pattern,v_cat_code,v_product_name,
+    v_brand,v_size_range,v_size_ratio,v_layers::integer,v_qty::integer,v_cut,v_delivery,
+    v_house,v_cutter,v_price,nullif(btrim(p_data->>'note'),''),v_uid
+  ) RETURNING id INTO v_job_id;
+  v_job_code:='RAP'||lpad(v_job_id::text,7,'0');
+  UPDATE public.pattern_jobs SET job_code=v_job_code WHERE id=v_job_id;
+  FOR v_image_obj IN SELECT value FROM jsonb_array_elements(v_images) LOOP
+    INSERT INTO public.pattern_job_images(job_id,storage_path,uploaded_by)
+    VALUES(v_job_id,v_image_obj #>> '{}',v_uid);
+  END LOOP;
+
+  RETURN jsonb_build_object('job_code',v_job_code,'already_created',false);
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.az_pattern_house_entry_create(uuid,jsonb) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.az_pattern_house_entry_create(uuid,jsonb) TO authenticated;
+REVOKE ALL ON FUNCTION public.az_pattern_customer_entry_create(uuid,jsonb) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.az_pattern_customer_entry_create(uuid,jsonb) TO authenticated;
+NOTIFY pgrst,'reload schema';
+COMMIT;
+
+-- CHI DOC: two creation functions installed; no PNR or customer job created by this query.
+SELECT to_regprocedure('public.az_pattern_house_entry_create(uuid,jsonb)') IS NOT NULL AS house_rpc_ok,
+       to_regprocedure('public.az_pattern_customer_entry_create(uuid,jsonb)') IS NOT NULL AS customer_rpc_ok,
+       EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public'
+         AND table_name='pattern_jobs' AND column_name='delivery_date') AS delivery_date_column_ok;
