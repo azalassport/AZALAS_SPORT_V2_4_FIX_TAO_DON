@@ -1,5 +1,6 @@
 "use client";
 
+import { R2_PATTERN_SLIP_READY, R2_SQL_BLOCKED_MESSAGE } from "@/lib/azalas/r2-rollout-gates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -161,6 +162,7 @@ export default function PatternHouseEntry() {
 
   async function capturePreview() {
     if (busy || !showPreview || !paper.current || !plan.value) return;
+    if (!R2_PATTERN_SLIP_READY) return setError(R2_SQL_BLOCKED_MESSAGE);
     setBusy(true); setError(""); setOk("");
     try {
       const { data: { user } } = await sb.auth.getUser();
