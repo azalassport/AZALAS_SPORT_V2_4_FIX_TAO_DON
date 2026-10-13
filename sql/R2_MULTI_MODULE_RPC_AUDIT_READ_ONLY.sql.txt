@@ -1,0 +1,24 @@
+-- AZALAS SPORT | R2 MULTI-MODULE SQL AUDIT | CHI DOC
+-- Chay trong SQL Editor cua DUNG Supabase project da ket noi Preview.
+-- KHONG cap nhat RPC, khong doi schema, khong tao giao dich hay anh.
+-- Gui ket qua file CSV de chuan bi migration dung voi ham DANG CHAY.
+
+SELECT
+  p.proname AS function_name,
+  p.oid::regprocedure::text AS signature,
+  CASE WHEN lower(pg_get_functiondef(p.oid)) LIKE '%storage.objects%'
+    THEN true ELSE false END AS verifies_supabase_storage,
+  CASE WHEN lower(pg_get_functiondef(p.oid)) LIKE '%r2:%'
+    THEN true ELSE false END AS mentions_r2,
+  pg_get_functiondef(p.oid) AS current_definition
+FROM pg_proc p
+JOIN pg_namespace n ON n.oid = p.pronamespace
+WHERE n.nspname = 'public'
+  AND p.proname IN (
+    'az_pattern_house_entry_create',
+    'az_pattern_customer_entry_create',
+    'az_stock_set_image',
+    'az_return_finalize_direct',
+    'az_update_my_profile'
+  )
+ORDER BY p.proname, p.oid::regprocedure::text;
