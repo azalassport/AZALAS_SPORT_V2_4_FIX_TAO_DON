@@ -1,0 +1,57 @@
+-- AZALAS SPORT | SQL 42 | MEMBER TAO DON - KIEM TRA CHI DOC
+-- Chi SELECT, khong sua SQL, khong them/xoa/tao don, khong doi quyen.
+-- CHAY TREN DUNG SUPABASE PROJECT CUA APP CHINH. Export CSV va gui lai.
+-- Lay definitions that ARE RUNNING NOW; do not blindly copy old sql/01_CREATE_ALL.sql.
+
+WITH wanted(fn) AS (
+  VALUES ('az_create_order'), ('az_attach_order_image'), ('az_is_staff'),
+         ('az_is_manager'), ('az_create_warehouse'), ('az_order_customer_options'),
+         ('az_soft_delete_order')
+),
+functions AS (
+  SELECT 'RPC'::text AS kind,
+         w.fn AS name,
+         coalesce(p.oid::regprocedure::text,'(not present)') AS detail,
+         CASE WHEN p.oid IS NULL THEN 'MISSING' ELSE
+           concat('security_definer=',p.prosecdef::text,
+                  '; authenticated_execute=',has_function_privilege('authenticated',p.oid,'EXECUTE')::text,
+                  '; function=',pg_get_functiondef(p.oid))
+         END AS definition
+  FROM wanted w
+  LEFT JOIN pg_proc p ON p.proname=w.fn
+    AND p.pronamespace='public'::regnamespace
+),
+policies AS (
+  SELECT 'POLICY'::text AS kind,
+         p.schemaname||'.'||p.tablename AS name,
+         p.policyname||'; cmd='||p.cmd||'; roles='||array_to_string(p.roles,',') AS detail,
+         concat('USING: ',coalesce(p.qual,'(none)'),
+                ' | WITH CHECK: ',coalesce(p.with_check,'(none)')) AS definition
+  FROM pg_policies p
+  WHERE (p.schemaname='public' AND p.tablename IN
+        ('az_customers','az_warehouses','order_groups','order_units','order_images'))
+    OR (p.schemaname='storage' AND p.tablename='objects' AND
+        (p.qual ILIKE '%az-order-images%' OR
+         p.with_check ILIKE '%az-order-images%' OR
+         p.policyname ILIKE '%order%'))
+),
+rls AS (
+  SELECT 'TABLE_RLS'::text AS kind,
+         schemaname||'.'||tablename AS name,
+         'rls_enabled='||rowsecurity::text AS detail,
+         'row_security check only'::text AS definition
+  FROM pg_tables
+  WHERE schemaname='public' AND tablename IN
+        ('az_customers','az_warehouses','order_groups','order_units','order_images')
+),
+storage_bucket AS (
+  SELECT 'BUCKET'::text AS kind, id::text AS name,
+         'public='||public::text AS detail,
+         'file_size_limit='||coalesce(file_size_limit::text,'(none)') AS definition
+  FROM storage.buckets WHERE id='az-order-images'
+)
+SELECT kind,name,detail,definition FROM functions
+UNION ALL SELECT kind,name,detail,definition FROM policies
+UNION ALL SELECT kind,name,detail,definition FROM rls
+UNION ALL SELECT kind,name,detail,definition FROM storage_bucket
+ORDER BY kind,name,detail;
