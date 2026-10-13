@@ -37,6 +37,25 @@ export async function POST(request:NextRequest){
   if(!actor)return errorJson("Không có quyền lưu ảnh nhà vải",403);
   const r2=await bucket();
   if(!r2)return errorJson("Cloudflare R2 chưa được cấu hình",503);
+  if(request.nextUrl.searchParams.get("probe")==="1"){
+    // Temporary preview-only diagnostic: never writes to Supabase Database.
+    // Round-trip a small R2 object and always delete it.
+    const key=`${actor.user.id}/_diagnostics/${crypto.randomUUID()}.txt`;
+    const payload=`azalas-r2-roundtrip-${crypto.randomUUID()}`;
+    let put=false,read=false,deleted=false;
+    try{
+      await r2.put(key,new TextEncoder().encode(payload),{httpMetadata:{contentType:"text/plain"}});
+      put=true;
+      const stored=await r2.get(key);
+      read=!!stored?.body && await new Response(stored.body).text()===payload;
+      if(!read)throw new Error("Nội dung R2 đọc lại không khớp");
+    }catch(e){
+      return errorJson(`Kiểm tra R2 lỗi: ${e instanceof Error?e.message:String(e)}`,500);
+    }finally{
+      try{await r2.delete(key);deleted=true;}catch{}
+    }
+    return NextResponse.json({ok:put&&read&&deleted,write:put,read,delete:deleted,database_changed:false});
+  }
   const form=await request.formData();
   const file=form.get("file");
   if(!(file instanceof File)||file.type!=="image/png"||!file.size||file.size>MAX_BYTES){
