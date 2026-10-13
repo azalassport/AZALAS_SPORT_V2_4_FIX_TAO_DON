@@ -1,0 +1,73 @@
+-- AZALAS SPORT - R2 MISSING RPC SCHEMA AUDIT - READ ONLY
+-- Chay tren Supabase SQL Editor DUNG project dang dung cho AZALAS.
+-- CHI SELECT: khong reset, khong tao ham, khong ghi hoa don/cong no.
+-- Gui lai bang ket qua cua truy van duoi day.
+WITH target_tables(table_name) AS (
+  VALUES
+  ('az_profiles'),
+  ('az_product_variants'),
+  ('az_warehouses'),
+  ('pattern_catalog'),
+  ('pattern_notes'),
+  ('pattern_entry_slips'),
+  ('pattern_jobs'),
+  ('pattern_job_images'),
+  ('pattern_job_size_plans'),
+  ('pattern_fabrics'),
+  ('sewing_houses'),
+  ('cutters'),
+  ('sewing_rates'),
+  ('return_slips'),
+  ('supply_entries')
+),
+table_info AS (
+  SELECT
+    'TABLE'::text AS object_type,
+    t.table_name AS object_name,
+    CASE WHEN to_regclass('public.' || t.table_name) IS NULL THEN 'MISSING'
+    ELSE COALESCE(string_agg(
+      c.column_name || ' ' || c.data_type ||
+      CASE WHEN c.is_nullable = 'NO' THEN ' NOT NULL' ELSE '' END,
+      '; ' ORDER BY c.ordinal_position
+    ), 'NO VISIBLE COLUMNS') END AS detail
+  FROM target_tables t
+  LEFT JOIN information_schema.columns c
+    ON c.table_schema = 'public' AND c.table_name = t.table_name
+  GROUP BY t.table_name
+),
+function_info AS (
+  SELECT 'FUNCTION'::text AS object_type, p.proname::text AS object_name,
+     pg_get_function_identity_arguments(p.oid) || ' -> ' ||
+       pg_get_function_result(p.oid) || 
+       CASE WHEN lower(pg_get_functiondef(p.oid)) LIKE '%storage.objects%'
+            THEN ' [checks storage.objects]' ELSE '' END AS detail
+  FROM pg_proc p
+  JOIN pg_namespace n ON n.oid = p.pronamespace
+  WHERE n.nspname = 'public'
+    AND (
+      p.proname ILIKE '%pattern%'
+      OR p.proname ILIKE '%stock%'
+      OR p.proname IN ('az_update_my_profile','az_is_manager','az_is_staff','az_return_finalize_direct')
+    )
+),
+missing_info AS (
+  SELECT 'REQUIRED RPC'::text AS object_type, x.fn AS object_name,
+     CASE WHEN EXISTS(
+       SELECT 1 FROM pg_proc p
+       JOIN pg_namespace n ON n.oid = p.pronamespace
+       WHERE n.nspname = 'public' AND p.proname = x.fn
+     ) THEN 'FOUND' ELSE 'MISSING' END AS detail
+  FROM (VALUES
+    ('az_pattern_house_entry_create'),
+    ('az_pattern_customer_entry_create'),
+    ('az_stock_set_image'),
+    ('az_update_my_profile')
+  ) x(fn)
+)
+SELECT object_type, object_name, detail
+FROM table_info
+UNION ALL
+SELECT object_type, object_name, detail FROM function_info
+UNION ALL
+SELECT object_type, object_name, detail FROM missing_info
+ORDER BY object_type, object_name;
