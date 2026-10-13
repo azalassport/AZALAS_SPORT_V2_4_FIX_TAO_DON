@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrls } from "@/lib/azalas/media-client";
 import { ImageViewer, Loading, Msg } from "@/components/ui";
 import { Boxes, CheckCircle2, Clock3, Factory, Search, Sparkles, WalletCards } from "lucide-react";
 import { day, dt, norm } from "@/lib/azalas/format";
@@ -121,10 +122,7 @@ export default function PatternProgress() {
         setJobs(basic); setSlips({}); setSizePlans([]); setReceipts([]);
         setEvents([]); setProfiles({}); setVetStatus({});
         const paths = [...new Set(loadedPhotos.map(photo => photo.storage_path))];
-        const signResult = paths.length ? await sb.storage.from("az-pattern-images")
-          .createSignedUrls(paths, 3600) : { data: [], error: null };
-        if (signResult.error) throw new Error("Ảnh rập: " + signResult.error.message);
-        setSignedUrls(Object.fromEntries(paths.map((p, i) => [p, signResult.data?.[i]?.signedUrl || ""])));
+        setSignedUrls(await mediaUrls(sb, "az-pattern-images", paths, 3600));
         return;
       }
       const [jobResult, planResult, receiptResult, eventResult, housesResult, cuttersResult, patternsResult,
@@ -176,9 +174,7 @@ export default function PatternProgress() {
         ...loadedPhotos.map(x => x.storage_path),
         ...loadedSlips.flatMap(slip => [slip.preview_image_path, ...(slip.image_paths || [])]),
       ].filter(Boolean))];
-      const signed = paths.length ? await sb.storage.from("az-pattern-images")
-        .createSignedUrls(paths, 3600) : { data: [], error: null };
-      if (signed.error) throw new Error("Ảnh rập: " + signed.error.message);
+      const signedUrls = await mediaUrls(sb, "az-pattern-images", paths, 3600);
       setJobs(enriched);
       setSlips(Object.fromEntries(loadedSlips.map(slip => [slip.id, slip])));
       setSizePlans((planResult.data || []) as SizePlan[]);
@@ -192,7 +188,7 @@ export default function PatternProgress() {
       setProfiles(Object.fromEntries(names.map(n => [n.id, n.display_name || "Chưa đặt tên"])));
       const loadedVet = (vetStatusResult.data || []) as VetStatus[];
       setVetStatus(Object.fromEntries(loadedVet.map(row => [row.job_id, row])));
-      setSignedUrls(Object.fromEntries(paths.map((path, i) => [path, signed.data?.[i]?.signedUrl || ""])));
+      setSignedUrls(signedUrls);
     } catch (err) {
       setVetStatus({});
       setError(err instanceof Error ? err.message : String(err));
