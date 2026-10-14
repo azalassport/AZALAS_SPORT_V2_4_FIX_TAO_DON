@@ -45,6 +45,7 @@ export default function NewOrderForm() {
   // Ngăn nhấn đúp trước khi React kịp render busy=true.
   const creationLocked = useRef(false);
   const [role, setRole] = useState("");
+  const canManageCatalog = role === "OWNER" || role === "ADMIN";
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -96,16 +97,21 @@ export default function NewOrderForm() {
     (async () => {
       const { data: { user } } = await sb.auth.getUser();
       if (!user) return;
-      const [{ data: profile }, { data: customerList, error: customerError }, { data: warehouseList, error: warehouseError }] = await Promise.all([
+      const [{ data: profile, error: profileError }, { data: warehouseList, error: warehouseError }] = await Promise.all([
         sb.from("az_profiles").select("role").eq("id", user.id).single(),
-        sb.from("az_customers").select("id,name,phone").order("id", { ascending: false }).limit(500),
         sb.from("az_warehouses").select("id,code,name").eq("is_active", true).order("name"),
       ]);
       if (!active) return;
-      setRole(profile?.role ?? "");
-      setCustomers(customerList ?? []);
+      const { data: customerList, error: customerError } = profile?.role === "MEMBER"
+        ? await sb.rpc("az_order_customer_options")
+        : await sb.from("az_customers").select("id,name,phone").order("id", { ascending: false }).limit(500);
+      if (!active) return;
+      setRole(profile?.role ?? "UNAVAILABLE");
+      setCustomers((customerList ?? []) as Customer[]);
       setWarehouses(warehouseList ?? []);
-      if (customerError || warehouseError) setError(customerError?.message || warehouseError?.message || "");
+      if (profileError || customerError || warehouseError) {
+        setError(profileError?.message || customerError?.message || warehouseError?.message || "");
+      }
     })();
     return () => { active = false; };
   }, [sb]);
@@ -147,6 +153,7 @@ export default function NewOrderForm() {
   }
 
   async function createCustomer() {
+    if (!canManageCatalog) return setError("Chỉ OWNER/ADMIN được thêm khách hàng.");
     setError("");
     if (!newCustomer.name.trim()) return setError("Tên khách bắt buộc.");
     const { data: { user } } = await sb.auth.getUser();
@@ -164,6 +171,7 @@ export default function NewOrderForm() {
   }
 
   async function addWarehouse() {
+    if (!canManageCatalog) return setError("Chỉ OWNER/ADMIN được thêm kho.");
     const name = newWarehouseName.trim();
     if (!name) return setError("Bạn cần nhập tên kho trước khi lưu.");
     setWarehouseBusy(true);
@@ -272,12 +280,11 @@ export default function NewOrderForm() {
     }
   }
 
-  if (role && role !== "OWNER" && role !== "ADMIN") {
-    return (
-      <p className="rounded-2xl border border-red-100 bg-red-50 p-5 text-[16px] font-bold text-red-800">
-        Tài khoản MEMBER không được tạo đơn.
-      </p>
-    );
+  if (!role) {
+    return <p className="rounded-2xl border border-blue-100 bg-blue-50 p-5 text-[16px] text-blue-900">Đang kiểm tra quyền tạo đơn...</p>;
+  }
+  if (role !== "OWNER" && role !== "ADMIN" && role !== "MEMBER") {
+    return <p className="rounded-2xl border border-red-100 bg-red-50 p-5 text-[16px] font-bold text-red-800">Tài khoản không có quyền tạo đơn.</p>;
   }
 
   return (
@@ -458,7 +465,7 @@ export default function NewOrderForm() {
                     })}
                   </div>
 
-                  {!showNewWarehouse ? (
+                  {canManageCatalog && !showNewWarehouse ? (
                     <button
                       type="button"
                       className="inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl border border-blue-100 bg-blue-100/80 px-5 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-200"
@@ -471,7 +478,7 @@ export default function NewOrderForm() {
                   ) : null}
                 </div>
 
-                {showNewWarehouse && (
+                {canManageCatalog && showNewWarehouse && (
                   <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4">
                     <label className="block text-[16px] font-bold text-slate-800">
                       Tên kho mới (OWNER / ADMIN)
@@ -534,14 +541,16 @@ export default function NewOrderForm() {
                       Khách hàng <span className="text-red-500">*</span>
                     </label>
 
-                    <button
-                      type="button"
-                      onClick={() => setAddCustomer((old) => !old)}
-                      className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-blue-100 px-5 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-200"
-                    >
-                      <Plus size={20} strokeWidth={2.6} />
-                      Thêm khách
-                    </button>
+                    {canManageCatalog && (
+                      <button
+                        type="button"
+                        onClick={() => setAddCustomer((old) => !old)}
+                        className="inline-flex min-h-[48px] items-center gap-2 rounded-xl bg-blue-100 px-5 py-3 text-[16px] font-extrabold text-blue-700 transition hover:bg-blue-200"
+                      >
+                        <Plus size={20} strokeWidth={2.6} />
+                        Thêm khách
+                      </button>
+                    )}
                   </div>
 
                   <div className="relative">
@@ -584,7 +593,7 @@ export default function NewOrderForm() {
                     </div>
                   )}
 
-                  {addCustomer && (
+                  {canManageCatalog && addCustomer && (
                     <div className="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4 sm:grid-cols-2">
                       {(
                         [
