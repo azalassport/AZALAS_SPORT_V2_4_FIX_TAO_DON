@@ -12,7 +12,8 @@
     "dev:vinext": "vite dev --port 3001",
     "build:vinext": "vite build",
     "start:vinext": "vite preview",
-    "deploy:vinext": "vinext-cloudflare deploy"
+    "check:cf-r2": "node scripts/patch-cf-r2-undefined.mjs --check",
+    "deploy:vinext": "node scripts/patch-cf-r2-undefined.mjs --apply && vinext-cloudflare deploy"
   },
   "dependencies": {
     "@supabase/ssr": "^0.6.1",
