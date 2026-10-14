@@ -161,7 +161,7 @@ edited = edited.slice(0, functionPosition) + helper + edited.slice(functionPosit
 
 // Final invariants: exactly one helper declaration and targeted assignment.
 assert.equal(edited.split(`function ${PATCH_ID}(`).length, 2);
-assert.ok(edited.includes(`normalizedRemote[key] = ${PATCH_ID}(value);`));
+assert.ok(new RegExp(`normalizedRemote\\s*\\[\\s*key\\s*\\]\\s*=\\s*${PATCH_ID}\\(value\\);`).test(edited));
 writeFileSync(item.filename, edited, "utf8");
 
 console.log(
