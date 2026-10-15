@@ -1,0 +1,38 @@
+{
+  // AZALAS SPORT — CHỈ KIỂM TRA --dry-run. CHƯA ĐƯỢC DÙNG ĐỂ DEPLOY THẬT.
+  // Phương án thử Wrangler thay cho cf CLI để chẩn đoán lỗi so sánh R2.
+  // KHÔNG thay thế cloudflare.config.ts; KHÔNG đưa file này vào main.
+  "name": "azalas-sport-full",
+  "main": ".cloudflare/output/v0/workers/default/bundle/index.js",
+  "compatibility_date": "2026-10-06",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "keep_vars": true,
+  "assets": {
+    "directory": ".cloudflare/output/v0/workers/default/assets",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+  "r2_buckets": [
+    {
+      "binding": "AZALAS_IMAGES",
+      "bucket_name": "azalas-images"
+    }
+  ],
+  "secrets": {
+    "required": [
+      "NEXT_PUBLIC_SUPABASE_URL",
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY"
+    ]
+  },
+  "find_additional_modules": true,
+  "base_dir": ".cloudflare/output/v0/workers/default/bundle",
+  "rules": [
+    {
+      "type": "ESModule",
+      "globs": ["**/*.js"],
+      "fallthrough": true
+    }
+  ]
+}
