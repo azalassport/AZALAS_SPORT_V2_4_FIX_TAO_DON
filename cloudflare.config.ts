@@ -9,7 +9,7 @@ export default defineConfig({
     assets: { notFoundHandling: "none" },
     env: {
       ASSETS: bindings.assets(),
-
+      AZALAS_IMAGES: bindings.r2({ name: "azalas-images" }),
       // Supabase
       // Các giá trị thật KHÔNG được ghi trực tiếp vào file này.
       // Khi deploy, Cloudflare sẽ nhận chúng từ secrets.

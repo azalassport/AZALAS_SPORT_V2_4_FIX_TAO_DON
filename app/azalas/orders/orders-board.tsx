@@ -33,7 +33,6 @@ type Unit = {
   order_code: string;
   status: string;
   started_by_name: string | null;
-  started_by: string | null;
   deferred_by_name: string | null;
   created_at: string;
 };
@@ -160,7 +159,6 @@ export default function OrdersBoard() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
 
   const [role, setRole] = useState("");
-  const [currentUserId, setCurrentUserId] = useState("");
   const [tab, setTab] = useState<Tab>("MOI");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -207,7 +205,7 @@ export default function OrdersBoard() {
       ? await sb
           .from("order_units")
           .select(
-            "id,group_id,warehouse_id,order_code,status,started_by,started_by_name,deferred_by_name,created_at",
+            "id,group_id,warehouse_id,order_code,status,started_by_name,deferred_by_name,created_at",
           )
           .in("group_id", groupIds)
           .order("created_at", { ascending: true })
@@ -215,7 +213,6 @@ export default function OrdersBoard() {
       : { data: [] as Unit[], error: null };
 
     setRole(p?.role || "");
-    setCurrentUserId(user.id);
     setGroups(g || []);
     setWarehouses(w || []);
     setUnits((u || []) as Unit[]);
@@ -247,7 +244,6 @@ export default function OrdersBoard() {
     };
 
     for (const unit of units) {
-      if (unit.status === "DANG_SOAN" && role === "MEMBER" && unit.started_by !== currentUserId) continue;
       const group = groupMap.get(unit.group_id);
       if (!group) continue;
 
@@ -268,14 +264,13 @@ export default function OrdersBoard() {
     }
 
     return result;
-  }, [groupMap, units, role, currentUserId]);
+  }, [groupMap, units]);
 
   const visible = useMemo(() => {
     const needle = normalizeText(search.trim());
 
     return units
       .filter((unit) => {
-        if (unit.status === "DANG_SOAN" && role === "MEMBER" && unit.started_by !== currentUserId) return false;
         const group = groupMap.get(unit.group_id);
         if (!group) return false;
 
@@ -308,7 +303,7 @@ export default function OrdersBoard() {
           +new Date(a.created_at) - +new Date(b.created_at)
         );
       });
-  }, [groupMap, search, tab, units, whMap, role, currentUserId]);
+  }, [groupMap, search, tab, units, whMap]);
 
   const warehouseGroups = useMemo(() => {
     const result = new Map<
@@ -331,12 +326,14 @@ export default function OrdersBoard() {
     return result;
   }, [visible, whMap]);
 
-  async function act(id: number, action: "defer" | "delete") {
+  async function act(id: number, action: "defer" | "delete" | "cancel_packing") {
     if (
       !confirm(
         action === "delete"
           ? "Xóa mềm đơn này?"
-          : "Chuyển đơn sang Nợ đơn?",
+          : action === "cancel_packing"
+            ? "Hủy soạn và đưa đơn về Đơn Mới? Các dòng hàng đã lưu nháp và ghi chú soạn sẽ bị xóa."
+            : "Chuyển đơn sang Nợ đơn?",
       )
     ) {
       return;
@@ -345,12 +342,13 @@ export default function OrdersBoard() {
     setBusyId(id);
     setError("");
 
-    const { error: e } =
-      action === "delete"
-        ? await sb.rpc("az_soft_delete_order", {
-            p_unit_id: id,
-            p_reason: "Xóa từ Chi tiết đơn",
-          })
+    const { error: e } = action === "delete"
+      ? await sb.rpc("az_soft_delete_order", {
+          p_unit_id: id,
+          p_reason: "Xóa từ Chi tiết đơn",
+        })
+      : action === "cancel_packing"
+        ? await sb.rpc("az_cancel_packing", { p_unit_id: id })
         : await sb.rpc("az_defer_order", { p_unit_id: id });
 
     if (e) setError(e.message);
@@ -652,6 +650,17 @@ export default function OrdersBoard() {
                                   className="min-h-[42px] rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-[14px] font-black text-slate-400"
                                 >
                                   Đã nợ đơn
+                                </button>
+                              )}
+
+                              {unit.status === "DANG_SOAN" && (
+                                <button
+                                  type="button"
+                                  disabled={busyId === unit.id}
+                                  onClick={() => void act(unit.id, "cancel_packing")}
+                                  className="min-h-[42px] rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-[14px] font-black text-blue-700 transition hover:bg-blue-100 disabled:opacity-50"
+                                >
+                                  Hủy soạn
                                 </button>
                               )}
 

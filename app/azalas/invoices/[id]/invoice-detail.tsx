@@ -9,7 +9,7 @@ import { ArrowLeft, Camera, CreditCard, FileText, Pencil, ReceiptText, RotateCcw
 
 type Invoice = {
   id: number; invoice_code: string; customer_id: number; customer_name: string;
-  status: string; subtotal: number; old_debt_snapshot: number;
+  status: string; subtotal: number; old_debt_snapshot: number; old_debt_override: number | null;
   invoice_image_path: string | null; created_at: string;
   finalized_at: string | null; deleted_at: string | null; note: string | null;
 };
@@ -75,6 +75,8 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   const [editRows, setEditRows] = useState<EditableLine[]>([]);
   const [editing, setEditing] = useState(false);
   const [lineDirty, setLineDirty] = useState(false);
+  const [oldDebtInput, setOldDebtInput] = useState("0");
+  const [oldDebtDirty, setOldDebtDirty] = useState(false);
   const [units, setUnits] = useState<Unit[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [photoGroups, setPhotoGroups] = useState<PhotoGroup[]>([]);
@@ -101,7 +103,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setErr("");
     setMediaError("");
     const { data: b, error: be } = await sb.from("invoices")
-      .select("id,invoice_code,customer_id,customer_name,status,subtotal,old_debt_snapshot,invoice_image_path,created_at,finalized_at,deleted_at,note")
+      .select("id,invoice_code,customer_id,customer_name,status,subtotal,old_debt_snapshot,old_debt_override,invoice_image_path,created_at,finalized_at,deleted_at,note")
       .eq("id", invoiceId).single();
     if (be || !b) {
       setBill(null);
@@ -142,6 +144,8 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setEditRows(invoiceLines.map(editFromLine));
     setEditing(false);
     setLineDirty(false);
+    setOldDebtInput(String(b.old_debt_override ?? b.old_debt_snapshot ?? 0));
+    setOldDebtDirty(false);
     setPay((paymentResult.data || []).map(p => ({
       method: p.method, payment_date: p.payment_date, amount: Number(p.amount),
       reason: p.reason || "", return_slip_id: p.return_slip_id,
@@ -257,7 +261,11 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   const subtotal = editing
     ? editRows.reduce((s, r) => s + Number(r.quantity || 0) * Number(r.unit_price || 0), 0)
     : lines.reduce((s, l) => s + l.line_total, 0);
-  const due = subtotal + Number(bill?.old_debt_snapshot || 0) + extras;
+  // Số nhập trong Sửa đơn là số chờ chốt, không phải công nợ đã ghi sổ.
+  const oldDebtShown = editing && oldDebtDirty
+    ? Number(oldDebtInput || 0)
+    : Number(bill?.old_debt_override ?? bill?.old_debt_snapshot ?? 0);
+  const due = subtotal + oldDebtShown + extras;
   const remaining = due - paid;
   const draft = bill?.status === "CHUA_CHOT";
   const orderCodes = units.map(u => u.order_code);
@@ -303,12 +311,15 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setEditRows(lines.map(editFromLine));
     setEditing(true);
     setLineDirty(false);
+    setOldDebtInput(String(bill?.old_debt_override ?? bill?.old_debt_snapshot ?? 0));
+    setOldDebtDirty(false);
     setErr("");
   }
   function stopEditing() {
-    if (lineDirty && !window.confirm("Bỏ các thay đổi sản phẩm chưa lưu?")) return;
+    if ((lineDirty || oldDebtDirty) && !window.confirm("Bỏ các thay đổi chưa lưu?")) return;
     setEditRows(lines.map(editFromLine));
     setLineDirty(false);
+    setOldDebtDirty(false);
     setEditing(false);
     setErr("");
   }
@@ -327,7 +338,13 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   }
   async function saveLines() {
     if (!bill || busy) return;
-    if (dirty) return setErr("Hãy lưu bảng thanh toán trước khi lưu sửa sản phẩm.");
+    if (dirty) return setErr("Hãy lưu bảng thanh toán trước khi lưu sửa đơn.");
+    if (!lineDirty && !oldDebtDirty) return;
+    const debtAmount = Number(oldDebtInput);
+    if (oldDebtDirty && (!/^\d+$/.test(oldDebtInput.trim()) ||
+        !Number.isSafeInteger(debtAmount) || debtAmount > 99999999999999)) {
+      return setErr("Nợ cũ không hợp lệ. Nhập số tiền VND không âm.");
+    }
     if (!editRows.length) return setErr("Hóa đơn cần ít nhất một dòng sản phẩm.");
     for (const r of editRows) {
       if (!r.product_name.trim()) return setErr("Vui lòng nhập tên cho tất cả dòng sản phẩm.");
@@ -339,19 +356,38 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     }
     setBusy(true);
     setErr("");
-    const { error } = await sb.rpc("az_invoice_replace_lines", {
-      p_invoice_id: bill.id,
-      p_lines: editRows.map(r => ({
-        id: r.id, product_name: r.product_name.trim(),
-        color: r.color, size: r.size,
-        quantity: Number(r.quantity), unit_price: Number(r.unit_price),
-      })),
-    });
+    // Lưu nợ cũ CHỜ CHỐT. RPC tự cập nhật mốc nợ cũ trong bản nháp
+    // nếu số dư thực tế đã thay đổi, không cập nhật công nợ khách ở bước này.
+    let balanceAutoRefreshed = false;
+    if (oldDebtDirty) {
+      const { data: debtResult, error: debtError } = await sb.rpc("az_invoice_set_old_debt_draft", {
+        p_invoice_id: bill.id,
+        p_new_old_debt: debtAmount,
+      });
+      if (debtError) { setBusy(false); return setErr(debtError.message); }
+      balanceAutoRefreshed = Boolean((debtResult as { balance_refreshed?: boolean } | null)?.balance_refreshed);
+    }
+    if (lineDirty) {
+      const { error: lineError } = await sb.rpc("az_invoice_replace_lines", {
+        p_invoice_id: bill.id,
+        p_lines: editRows.map(r => ({
+          id: r.id, product_name: r.product_name.trim(),
+          color: r.color, size: r.size,
+          quantity: Number(r.quantity), unit_price: Number(r.unit_price),
+        })),
+      });
+      if (lineError) {
+        setBusy(false);
+        invalidatePhoto();
+        return setErr(`Không lưu được dòng sản phẩm: ${lineError.message}. Nếu đã sửa nợ cũ, giá trị đó đang chờ chốt; hãy tải lại để kiểm tra.`);
+      }
+    }
     setBusy(false);
-    if (error) return setErr(error.message);
     invalidatePhoto();
     await load();
-    setOk("Đã lưu sửa đơn. Tổng tiền đã tính lại; cần chụp ảnh hóa đơn mới trước khi chốt.");
+    setOk(balanceAutoRefreshed
+      ? "Đã tự đồng bộ nợ cũ thực tế vào bản nháp và lưu số bạn sửa. Công nợ khách chưa đổi; hãy kiểm tra lại tổng tiền, chụp ảnh mới rồi chốt."
+      : "Đã lưu sửa đơn. Nợ cũ đã nhập chỉ cập nhật công nợ khách khi chốt thành công; hãy chụp lại ảnh hóa đơn.");
   }
 
   function editReturnRow(slipId: number, sourceId: number, field: "product_name" | "quantity" | "unit_price", value: string) {
@@ -598,10 +634,10 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     } catch (e) { setErr(errorText(e)); }
   }
   async function finalize() {
-    if (!bill || !photoPath || dirty || editing || lineDirty || anyReturnDirty || pendingReturns.length || returnPaymentMismatch || mediaError) return;
+    if (!bill || !photoPath || dirty || editing || lineDirty || oldDebtDirty || anyReturnDirty || pendingReturns.length || returnPaymentMismatch || mediaError) return;
     setBusy(true);
     setErr("");
-    const { error } = await sb.rpc("az_invoice_finalize", {
+    const { error } = await sb.rpc("az_invoice_finalize_with_old_debt", {
       p_invoice_id: bill.id, p_image_path: photoPath,
     });
     setBusy(false);
@@ -749,14 +785,28 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       </div>
       {editing && <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
         <button className="btn soft" type="button" onClick={addLine}>+ THÊM DÒNG</button>
-        <button className="btn success" type="button" disabled={busy || !lineDirty || editRows.length === 0} onClick={() => void saveLines()}>{busy ? "Đang lưu..." : "✓ LƯU SỬA ĐƠN"}</button>
+        <button className="btn success" type="button" disabled={busy || (!lineDirty && !oldDebtDirty) || editRows.length === 0} onClick={() => void saveLines()}>{busy ? "Đang lưu..." : "✓ LƯU SỬA ĐƠN"}</button>
       </div>}
 
 
       <div className="mt-6 border-t-2 border-slate-800 pt-4">
         <div className="ml-auto max-w-lg space-y-3 text-[19px] leading-7 sm:text-[20px]">
           <div className="flex items-baseline justify-between gap-5"><span className="font-bold text-slate-700">TỔNG ĐƠN HÀNG</span><b className={`${amountClass} text-slate-950`}>{money(subtotal)}</b></div>
-          <div className="flex items-baseline justify-between gap-5"><span className="font-bold text-slate-700">NỢ CŨ</span><b className={`${amountClass} text-slate-900`}>{money(bill.old_debt_snapshot)}</b></div>
+          <div className="flex items-center justify-between gap-5">
+            <span className="font-bold text-slate-700">NỢ CŨ</span>
+            {editing ? <div className="min-w-0 max-w-[240px] flex-1 text-right">
+              <input type="text" inputMode="numeric" aria-label="Sửa nợ cũ chờ chốt"
+                value={oldDebtInput} onChange={e => {
+                  const value = e.target.value.replace(/\D/g, "");
+                  setOldDebtInput(value);
+                  setOldDebtDirty(value !== String(bill.old_debt_override ?? bill.old_debt_snapshot ?? 0));
+                  invalidatePhoto();
+                }}
+                className={`${inputClass} text-right tabular-nums`} />
+              <p className="mt-1 text-[14px] font-bold text-blue-700">{money(Number(oldDebtInput || 0))} đ</p>
+              <p className="mt-1 text-[12px] font-semibold text-amber-700">Chỉ đổi công nợ khi chốt thành công</p>
+            </div> : <b className={`${amountClass} text-slate-900`}>{money(oldDebtShown)}</b>}
+          </div>
           {pay.filter(p => p.method === "CONG_THEM" && p.amount > 0).map((p, i) => <div key={`extra-${i}`} className="flex items-start justify-between gap-4 border-b border-dashed border-slate-200 pb-2">
             <div className="min-w-0 flex-1">
               <p className="text-[19px] font-bold text-slate-700">CỘNG THÊM · {day(p.payment_date)}</p>
@@ -922,8 +972,8 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
       {imageUrl && <ImageViewer urls={[imageUrl]} label="Ảnh hóa đơn" />}
       {draft ? <>
         <div className="flex flex-wrap gap-3">
-          <button disabled={busy || editing || lineDirty || anyReturnDirty || pendingReturns.length > 0 || returnPaymentMismatch || !!mediaError} onClick={() => void capture()} className="btn primary">{busy ? "Đang chụp và lưu..." : "📷 Chụp, lưu ảnh và sao chép gửi Zalo"}</button>
-          {photoPath && !dirty && !editing && !lineDirty && !anyReturnDirty && pendingReturns.length === 0 && !returnPaymentMismatch && <>
+          <button disabled={busy || editing || lineDirty || oldDebtDirty || anyReturnDirty || pendingReturns.length > 0 || returnPaymentMismatch || !!mediaError} onClick={() => void capture()} className="btn primary">{busy ? "Đang chụp và lưu..." : "📷 Chụp, lưu ảnh và sao chép gửi Zalo"}</button>
+          {photoPath && !dirty && !editing && !lineDirty && !oldDebtDirty && !anyReturnDirty && pendingReturns.length === 0 && !returnPaymentMismatch && <>
             <button className="btn soft" onClick={() => void copyImage()}>Sao chép lại (nếu cần)</button>
             <button className="btn success" disabled={busy || !!mediaError || anyReturnDirty || pendingReturns.length > 0 || returnPaymentMismatch} onClick={() => void finalize()}>✓ XÁC NHẬN CHỐT HÓA ĐƠN</button>
           </>}
