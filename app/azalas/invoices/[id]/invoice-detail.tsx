@@ -93,6 +93,12 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
+  // Huy mem mot don da soan ngay tai hoa don nhap (co xac nhan).
+  const [orderDeleteOpen, setOrderDeleteOpen] = useState(false);
+  const [orderDeleteUnitId, setOrderDeleteUnitId] = useState<number | null>(null);
+  const [orderDeleteReason, setOrderDeleteReason] = useState("");
+  // Hien loi thanh toan ngay tai khu vuc thanh toan, khong che boi loi chup anh.
+  const [paymentIssue, setPaymentIssue] = useState("");
   // Lỗi xác nhận hàng trả luôn hiện ngay bên dưới phiếu được bấm.
   // Không đưa nội dung này vào vùng chụp ảnh hóa đơn.
   const [returnIssue, setReturnIssue] = useState("");
@@ -102,6 +108,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setLoading(true);
     setErr("");
     setMediaError("");
+    setPaymentIssue("");
     const { data: b, error: be } = await sb.from("invoices")
       .select("id,invoice_code,customer_id,customer_name,status,subtotal,old_debt_snapshot,old_debt_override,invoice_image_path,created_at,finalized_at,deleted_at,note")
       .eq("id", invoiceId).single();
@@ -524,31 +531,47 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     setOk("Đã bỏ phiếu hàng trả khỏi hóa đơn; chưa cấn trừ công nợ.");
   }
 
-  async function savePayments(reloadAfter = true) {
-    if (!bill) return false;
+  async function savePayments(reloadAfter = true): Promise<{ ok: boolean; error?: string }> {
+    const fail = (message: string): { ok: false; error: string } => {
+      setPaymentIssue(message);
+      setErr(message);
+      setOk("");
+      return { ok: false, error: message };
+    };
+    if (!bill) return fail("Không tìm thấy hóa đơn để lưu thanh toán.");
     if (lineDirty || editing || anyReturnDirty) {
-      setErr("Hãy lưu sửa sản phẩm và chi tiết hàng trả trước khi lưu thanh toán.");
-      return false;
+      return fail("Hãy lưu sửa sản phẩm và chi tiết hàng trả trước khi lưu thanh toán.");
     }
     const rows = pay.filter(p => p.amount > 0);
     for (const p of rows) {
       if (p.method === "HANG_TRA" && !p.return_slip_id) {
-        setErr("Phiếu hàng trả chưa được xác nhận."); return false;
+        return fail("Phiếu hàng trả chưa được xác nhận.");
       }
       if (p.method === "CONG_THEM" && !p.reason.trim()) {
-        setErr("Cộng thêm phải có lý do."); return false;
+        return fail("Cộng thêm phải có lý do.");
       }
     }
-    const { error } = await sb.rpc("az_invoice_set_payments", {
-      p_invoice_id: bill.id, p_payments: rows,
-    });
-    if (error) { setErr(error.message); return false; }
-    setDirty(false);
-    invalidatePhoto();
-    setErr("");
-    if (reloadAfter) await load();
-    setOk("Đã lưu thanh toán. Chụp lại ảnh hóa đơn trước khi chốt.");
-    return true;
+    setPaymentIssue("");
+    try {
+      const { error } = await sb.rpc("az_invoice_set_payments", {
+        p_invoice_id: bill.id, p_payments: rows,
+      });
+      if (error) {
+        // Giu nguyen thong tin Supabase; khong thay bang thong bao chung.
+        const details = [error.message, error.details, error.hint,
+          error.code ? `Mã lỗi: ${error.code}` : ""].filter(Boolean).join(" · ");
+        return fail(`Không lưu được thanh toán: ${details}`);
+      }
+      setDirty(false);
+      invalidatePhoto();
+      setPaymentIssue("");
+      setErr("");
+      if (reloadAfter) await load();
+      setOk("Đã lưu thanh toán. Chụp lại ảnh hóa đơn trước khi chốt.");
+      return { ok: true };
+    } catch (error) {
+      return fail(`Không lưu được thanh toán: ${errorText(error)}`);
+    }
   }
 
   async function capture() {
@@ -566,7 +589,7 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     const blobPromise = (async (): Promise<Blob> => {
       if (dirty) {
         const saved = await savePayments(false);
-        if (!saved) throw new Error("Chưa lưu được thanh toán; vui lòng sửa và thử lại.");
+        if (!saved.ok) throw new Error(saved.error || "Không lưu được thanh toán.");
       }
       const { data: { user } } = await sb.auth.getUser();
       if (!user) throw new Error("Hết phiên đăng nhập");
@@ -659,6 +682,50 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
     if (error) setErr(error.message);
     else router.push("/azalas/invoices");
   }
+  function openDeleteOrder() {
+    if (!bill || bill.status !== "CHUA_CHOT") return;
+    setOrderDeleteUnitId(units.length === 1 ? units[0].id : null);
+    setOrderDeleteReason("");
+    setOrderDeleteOpen(true);
+    setErr("");
+  }
+  async function deleteLinkedOrder() {
+    if (!bill || bill.status !== "CHUA_CHOT" || busy) return;
+    const unit = units.find(u => u.id === orderDeleteUnitId);
+    if (!unit) return setErr("Bạn cần chọn đúng đơn muốn xóa.");
+    const reason = orderDeleteReason.trim();
+    if (reason.length < 3 || reason.length > 500) {
+      return setErr("Nhập lý do xóa đơn từ 3 đến 500 ký tự.");
+    }
+    const otherCount = units.filter(u => u.id !== unit.id).length;
+    const warning = `XÓA MỀM ĐƠN ${unit.order_code}?\n\n` +
+      `Hóa đơn nháp ${bill.invoice_code} sẽ bị hủy để bảo toàn dữ liệu.\n` +
+      (otherCount ? `${otherCount} đơn liên kết còn lại sẽ về danh sách Chưa gửi (không bị xóa).\n` : "") +
+      "Các sửa đổi và thanh toán CHƯA CHỐT trong hóa đơn nháp sẽ bị bỏ.\n" +
+      "Công nợ đã chốt của khách không được thay đổi.\n\n" +
+      `Lý do: ${reason}\n\nXác nhận tiếp tục?`;
+    if (!window.confirm(warning)) return;
+    setBusy(true);
+    setErr(""); setOk("");
+    try {
+      // 1 RPC DB duy nhat: huy ban nhap + xoa mem don trong cung transaction.
+      const { error } = await sb.rpc("az_invoice_cancel_linked_order_draft", {
+        p_invoice_id: bill.id, p_unit_id: unit.id, p_reason: reason,
+      });
+      if (error) {
+        const details = [error.message, error.details, error.hint,
+          error.code ? `Mã lỗi: ${error.code}` : ""].filter(Boolean).join(" · ");
+        setErr(`Không thể xóa đơn: ${details}`);
+        return;
+      }
+      setOrderDeleteOpen(false);
+      router.push("/azalas/invoices");
+    } catch (error) {
+      setErr(`Không thể xóa đơn: ${errorText(error)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function collect() {
     if (!bill) return;
     const value = window.prompt("Số tiền khách trả thêm (VND)");
@@ -731,6 +798,8 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
             disabled={busy} onClick={resetDraft}><RotateCcw size={17} /> Reset</button>
           <button className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 text-[14px] font-extrabold text-red-700 shadow-sm transition hover:bg-red-100 disabled:opacity-50"
             disabled={busy} onClick={cancelDraft}><Trash2 size={17} /> Xóa bản nháp</button>
+          <button type="button" className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-rose-300 bg-rose-100 px-4 text-[14px] font-extrabold text-rose-800 shadow-sm transition hover:bg-rose-200 disabled:opacity-50"
+            disabled={busy || units.length === 0 || !!mediaError} onClick={openDeleteOrder}><Trash2 size={17} /> Xóa đơn</button>
           <button className="inline-flex min-h-[46px] items-center justify-center gap-2 rounded-xl border border-blue-600 bg-blue-600 px-4 text-[14px] font-extrabold text-white shadow-md shadow-blue-100 transition hover:bg-blue-700 disabled:opacity-50"
             disabled={busy} onClick={editing ? stopEditing : startEditing}><Pencil size={17} /> {editing ? "Đóng sửa" : "Sửa đơn"}</button>
         </>}
@@ -742,6 +811,35 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
         </>}
       </div>
     </section>
+
+    {draft && orderDeleteOpen && <section className="mx-auto w-full max-w-6xl space-y-3 rounded-[22px] border-2 border-rose-200 bg-rose-50 p-5 shadow-sm sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-[21px] font-black text-rose-900">Xóa mềm đơn đã soạn</h2>
+        <button type="button" className="rounded-lg border border-rose-200 bg-white px-3 py-2 text-[14px] font-bold text-rose-800" onClick={() => setOrderDeleteOpen(false)} disabled={busy}>Đóng</button>
+      </div>
+      <p className="text-[15px] font-semibold leading-6 text-rose-900">
+        Chỉ đơn được chọn bị xóa. Để tránh sai số tiền, toàn bộ hóa đơn NHÁP sẽ bị hủy;
+        các đơn liên kết còn lại quay lại Chưa gửi. Thanh toán và chỉnh sửa chưa chốt trong nháp sẽ mất.
+        Không tác động hóa đơn đã chốt hoặc công nợ đã ghi sổ.
+      </p>
+      <label className="block space-y-1.5 text-[15px] font-bold text-slate-900">
+        <span>Chọn đơn cần xóa</span>
+        <select className="w-full rounded-xl border border-rose-200 bg-white px-3 py-3 text-[16px] font-semibold" value={orderDeleteUnitId ?? ""} onChange={e => setOrderDeleteUnitId(e.target.value ? Number(e.target.value) : null)} disabled={busy}>
+          <option value="">— Chọn mã đơn —</option>
+          {units.map(u => <option key={u.id} value={u.id}>{u.order_code}</option>)}
+        </select>
+      </label>
+      <label className="block space-y-1.5 text-[15px] font-bold text-slate-900">
+        <span>Lý do hủy đơn (bắt buộc)</span>
+        <textarea className="w-full rounded-xl border border-rose-200 bg-white px-3 py-3 text-[16px] font-medium" rows={2} maxLength={500} placeholder="Ví dụ: Khách hủy mua hàng" value={orderDeleteReason} onChange={e => setOrderDeleteReason(e.target.value)} disabled={busy} />
+      </label>
+      <div className="flex flex-wrap gap-3">
+        <button type="button" disabled={busy || !orderDeleteUnitId || orderDeleteReason.trim().length < 3} onClick={() => void deleteLinkedOrder()} className="min-h-[46px] rounded-xl bg-rose-700 px-5 py-2.5 text-[15px] font-extrabold text-white hover:bg-rose-800 disabled:opacity-50">
+          {busy ? "Đang xử lý..." : "Xác nhận xóa đơn"}
+        </button>
+        <button type="button" disabled={busy} onClick={() => setOrderDeleteOpen(false)} className="min-h-[46px] rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-[15px] font-bold text-slate-700">Không xóa</button>
+      </div>
+    </section>}
 
     <Msg error={err || mediaError} success={ok} />
     {returnPaymentMismatch && <p className="mx-auto w-full max-w-6xl rounded-xl border border-red-300 bg-red-50 p-3 text-sm font-semibold text-red-900">
@@ -953,6 +1051,9 @@ export default function InvoiceDetail({ invoiceId }: { invoiceId: number }) {
           <input className="field" placeholder="Ghi chú thanh toán / điều chỉnh (nếu có)" value={p.reason || ""} onChange={e => editPayment(i, "reason", e.target.value)} />
           <button className="btn danger" onClick={() => { setPay(rows => rows.filter((_, j) => j !== i)); setDirty(true); invalidatePhoto(); }}>Bỏ dòng</button>
         </div>)}
+      {paymentIssue && <p role="alert" className="whitespace-pre-wrap break-words rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-[15px] font-bold leading-6 text-red-900">
+        {paymentIssue}
+      </p>}
       <div className="flex flex-wrap gap-3">
         <button className="btn soft" onClick={addPay}>+ Thêm thanh toán</button>
         <button className="btn primary" disabled={busy || !dirty || editing || anyReturnDirty} onClick={() => void savePayments()}>Lưu bảng thanh toán</button>
