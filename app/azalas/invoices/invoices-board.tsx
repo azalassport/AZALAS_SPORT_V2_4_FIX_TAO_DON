@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import DeletedOrdersPanel from "./deleted-orders-panel";
 import {
   ArrowRight,
   CalendarDays,
@@ -497,7 +498,7 @@ export default function InvoicesBoard() {
           </div>
         </section>
       )}
-
+      {!loading && tab === "DA_XOA" && <DeletedOrdersPanel search={search} />}
       {!loading && tab !== "CHUA_GUI" && billsFiltered.length > 0 && (
         <section className="rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_12px_34px_rgba(30,98,193,0.07)] sm:p-6">
           <div className="mb-4 flex items-center gap-3">
@@ -539,7 +540,7 @@ export default function InvoicesBoard() {
         </section>
       )}
 
-      {!loading && tab !== "CHUA_GUI" && !billsFiltered.length && (
+{!loading && tab === "DA_GUI" && !billsFiltered.length && (
         <div className="rounded-2xl border border-blue-100 bg-white p-6 text-center text-[15px] text-slate-500 shadow-[0_8px_24px_rgba(30,98,193,0.05)]">
           Chưa có hóa đơn phù hợp.
         </div>
