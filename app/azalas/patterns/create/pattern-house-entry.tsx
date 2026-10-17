@@ -1,8 +1,10 @@
 "use client";
 
+import { R2_PATTERN_SLIP_READY, R2_SQL_BLOCKED_MESSAGE } from "@/lib/azalas/r2-rollout-gates";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { uploadR2File } from "@/lib/azalas/media-client";
 import { Msg, PhotoInput } from "@/components/ui";
 import { day, errorText } from "@/lib/azalas/format";
 import PatternCodePicker from "./pattern-code-picker";
@@ -160,6 +162,7 @@ export default function PatternHouseEntry() {
 
   async function capturePreview() {
     if (busy || !showPreview || !paper.current || !plan.value) return;
+    if (!R2_PATTERN_SLIP_READY) return setError(R2_SQL_BLOCKED_MESSAGE);
     setBusy(true); setError(""); setOk("");
     try {
       const { data: { user } } = await sb.auth.getUser();
@@ -171,10 +174,7 @@ export default function PatternHouseEntry() {
         useCORS: true, logging: false });
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(
         b => b ? resolve(b) : reject(new Error("Không thể tạo ảnh phiếu")), "image/png"));
-      const path = `${user.id}/pnr/${requestKey.current}/phieu-preview-${crypto.randomUUID()}.png`;
-      const { error: uploadError } = await sb.storage.from("az-pattern-images")
-        .upload(path, blob, { contentType: "image/png", upsert: false });
-      if (uploadError) throw uploadError;
+      const path = await uploadR2File(blob, "pattern", "phieu-preview.png");
       setPreviewPath(path);
       setOk("Đã chụp và LƯU ảnh phiếu thành công. Có thể lập phiếu PNR.");
     } catch (e) { setError("Lỗi chụp/lưu ảnh phiếu: " + errorText(e)); }
@@ -189,6 +189,7 @@ export default function PatternHouseEntry() {
     if (!showPreview || !previewPath) return setError("Hãy Xem trước → Chụp & lưu ảnh phiếu trước khi lập PNR.");
     if (!form.cutDate || !form.houseId || !form.cutterId || !form.warehouseId || !form.fabricId || !form.patternId || !files.length)
       return setError("Thiếu thông tin bắt buộc hoặc ảnh rập.");
+    if (!window.confirm("CHÚ Ý: Đây là Preview nhưng sử dụng CHUNG database với app chính. Tạo phiếu PNR này sẽ ghi dữ liệu thật. Bạn có xác nhận tạo phiếu không?")) return;
     setBusy(true); setError(""); setOk("");
     try {
       const { data: { user } } = await sb.auth.getUser();
@@ -201,10 +202,7 @@ export default function PatternHouseEntry() {
           const ext = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" :
             file.type === "image/webp" ? "webp" : "";
           if (!ext || file.size > 8 * 1024 * 1024) throw new Error(`Ảnh ${file.name} phải là PNG/JPG/WebP, tối đa 8MB.`);
-          const path = `${user.id}/pnr/${requestKey.current}/anh-${index}-${crypto.randomUUID()}.${ext}`;
-          const { error: e } = await sb.storage.from("az-pattern-images")
-            .upload(path, file, { contentType: file.type, upsert: false });
-          if (e) throw new Error(`Lưu ảnh ${file.name}: ${e.message}`);
+          const path = await uploadR2File(file, "pattern");
           savedPaths[index] = path;
           uploadedPaths.current = [...savedPaths];
           setImagePaths([...savedPaths]);

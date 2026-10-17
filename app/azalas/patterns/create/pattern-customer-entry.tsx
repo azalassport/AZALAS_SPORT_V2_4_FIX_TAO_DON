@@ -1,8 +1,10 @@
 "use client";
 
+import { R2_PATTERN_SLIP_READY, R2_SQL_BLOCKED_MESSAGE } from "@/lib/azalas/r2-rollout-gates";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { uploadR2File } from "@/lib/azalas/media-client";
 import { Msg, PhotoInput } from "@/components/ui";
 import { errorText } from "@/lib/azalas/format";
 import { parseCustomerQuantity, rapSewingPriceError } from "@/lib/azalas/pattern-house";
@@ -96,11 +98,13 @@ export default function PatternCustomerEntry() {
   async function save() {
     setError(""); setOk("");
     if (busy) return;
+    if (!R2_PATTERN_SLIP_READY) return setError(R2_SQL_BLOCKED_MESSAGE);
     if (!files.length || files.length > 12) return setError("Cần 1–12 ảnh rập/sản phẩm. Có thể chụp, tải lên hoặc Ctrl + V.");
     if (!form.cutDate || !form.deliveryDate || !form.customerId || !form.patternId || !form.houseId || !form.cutterId)
       return setError("Chọn đủ ngày cắt, ngày giao, khách hàng, mã rập, nhà may và thợ cắt.");
     if (!form.sizeRange.trim()) return setError("Nhập size hoặc dải size của hàng khách đặt.");
     if (!quantity.value) return setError(quantity.error);
+    if (!window.confirm("CHÚ Ý: Preview đang dùng CHUNG database với app chính. Tạo Rập Khách đặt sẽ ghi dữ liệu thật. Bạn có đồng ý tiếp tục?")) return;
     setSewingPriceTouched(true);
     const priceError = rapSewingPriceError(form.sewingPrice);
     if (priceError) return setError(priceError);
@@ -114,10 +118,7 @@ export default function PatternCustomerEntry() {
         if (paths[index]) continue;
         const ext = file.type === "image/png" ? "png" : file.type === "image/jpeg" ? "jpg" : file.type === "image/webp" ? "webp" : "";
         if (!ext || file.size > 8 * 1024 * 1024) throw new Error(`Ảnh ${file.name} phải là PNG/JPG/WebP và tối đa 8 MB.`);
-        const path = `${user.id}/khach-dat/${requestKey.current}/anh-${index}-${crypto.randomUUID()}.${ext}`;
-        const {error: e} = await sb.storage.from("az-pattern-images")
-          .upload(path, file, {contentType: file.type, upsert: false});
-        if (e) throw new Error(`Chưa lưu được ảnh ${file.name}: ${e.message}`);
+        const path = await uploadR2File(file, "pattern");
         paths[index] = path; uploadedPaths.current = [...paths];
       }
       const {data, error: e} = await sb.rpc("az_pattern_customer_entry_create", {

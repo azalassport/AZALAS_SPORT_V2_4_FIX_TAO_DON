@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrls } from "@/lib/azalas/media-client";
 import { ImageViewer, Loading, Msg } from "@/components/ui";
 import { Boxes, CheckCircle2, Clock3, Factory, Search, Sparkles, WalletCards } from "lucide-react";
 import { day, dt, norm } from "@/lib/azalas/format";
@@ -20,7 +21,7 @@ type Job = {
 };
 type JobExtra = Pick<Job, "id" | "entry_slip_id" | "pattern_id" | "sewing_house_id" |
   "size_range" | "size_ratio" | "layer_count" | "cutter_id" | "sewing_price" | "forced_closed_at" |
-  "paid_at" | "paid_amount" | "payment_method" | "expected_warehouse_id">;
+  "paid_at" | "paid_amount" | "payment_method" | "expected_warehouse_id" | "delivery_date">;
 type Slip = { id: number; slip_code: string; mam_code: string; fabric_id: number | null;
   expected_warehouse_id: number | null; preview_image_path: string; image_paths: string[]; color_mode: string };
 type SizePlan = { id: number; job_id: number; color: string; size: string; layers: number; ratio: number; planned_qty: number };
@@ -121,15 +122,12 @@ export default function PatternProgress() {
         setJobs(basic); setSlips({}); setSizePlans([]); setReceipts([]);
         setEvents([]); setProfiles({}); setVetStatus({});
         const paths = [...new Set(loadedPhotos.map(photo => photo.storage_path))];
-        const signResult = paths.length ? await sb.storage.from("az-pattern-images")
-          .createSignedUrls(paths, 3600) : { data: [], error: null };
-        if (signResult.error) throw new Error("Ảnh rập: " + signResult.error.message);
-        setSignedUrls(Object.fromEntries(paths.map((p, i) => [p, signResult.data?.[i]?.signedUrl || ""])));
+        setSignedUrls(await mediaUrls(sb, "az-pattern-images", paths, 3600));
         return;
       }
       const [jobResult, planResult, receiptResult, eventResult, housesResult, cuttersResult, patternsResult,
         fabricsResult, warehouseResult, vetStatusResult] = await Promise.all([
-        sb.from("pattern_jobs").select("id,entry_slip_id,pattern_id,sewing_house_id,cutter_id,size_range,size_ratio,layer_count,sewing_price,forced_closed_at,paid_at,paid_amount,payment_method,expected_warehouse_id")
+        sb.from("pattern_jobs").select("id,entry_slip_id,pattern_id,sewing_house_id,cutter_id,size_range,size_ratio,layer_count,sewing_price,forced_closed_at,paid_at,paid_amount,payment_method,expected_warehouse_id,delivery_date")
           .in("id", ids).limit(500),
         sb.from("pattern_job_size_plans").select("id,job_id,color,size,layers,ratio,planned_qty")
           .in("job_id", ids).order("id").limit(4000),
@@ -150,7 +148,7 @@ export default function PatternProgress() {
       if (firstError) throw new Error("Không tải được chi tiết Tiến độ: " + firstError.message + ". Kiểm tra đã chạy SQL 13, 15, 17 và SQL 23 hàng vét.");
       const extras = (jobResult.data || []) as JobExtra[];
       const byId = new Map(extras.map(job => [job.id, job]));
-      const enriched = basic.map(job => ({ ...job, ...(byId.get(job.id) || {}) }));
+      const enriched = basic.map(job => { const extra=byId.get(job.id); return { ...job, ...extra, delivery_date: extra?.delivery_date || job.delivery_date }; });
       const slipIds = [...new Set(extras.map(job => job.entry_slip_id).filter((id): id is number => id != null))];
       let loadedSlips: Slip[] = [];
       if (slipIds.length) {
@@ -176,9 +174,7 @@ export default function PatternProgress() {
         ...loadedPhotos.map(x => x.storage_path),
         ...loadedSlips.flatMap(slip => [slip.preview_image_path, ...(slip.image_paths || [])]),
       ].filter(Boolean))];
-      const signed = paths.length ? await sb.storage.from("az-pattern-images")
-        .createSignedUrls(paths, 3600) : { data: [], error: null };
-      if (signed.error) throw new Error("Ảnh rập: " + signed.error.message);
+      const signedUrls = await mediaUrls(sb, "az-pattern-images", paths, 3600);
       setJobs(enriched);
       setSlips(Object.fromEntries(loadedSlips.map(slip => [slip.id, slip])));
       setSizePlans((planResult.data || []) as SizePlan[]);
@@ -192,7 +188,7 @@ export default function PatternProgress() {
       setProfiles(Object.fromEntries(names.map(n => [n.id, n.display_name || "Chưa đặt tên"])));
       const loadedVet = (vetStatusResult.data || []) as VetStatus[];
       setVetStatus(Object.fromEntries(loadedVet.map(row => [row.job_id, row])));
-      setSignedUrls(Object.fromEntries(paths.map((path, i) => [path, signed.data?.[i]?.signedUrl || ""])));
+      setSignedUrls(signedUrls);
     } catch (err) {
       setVetStatus({});
       setError(err instanceof Error ? err.message : String(err));

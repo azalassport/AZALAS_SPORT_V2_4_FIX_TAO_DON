@@ -1,0 +1,51 @@
+-- AZALAS SPORT | R2 PATTERN & STOCK DEPENDENCIES | READ ONLY
+-- Audit ONLY. No DDL/DML. Does not touch order / finance / inventory data.
+-- Obtain the live constraints/defaults/triggers before restoring creation RPCs.
+WITH tables(table_name) AS (
+ VALUES
+ ('pattern_entry_slips'), ('pattern_jobs'), ('pattern_job_size_plans'),
+ ('pattern_job_images'), ('pattern_catalog'), ('pattern_notes'),
+ ('sewing_houses'), ('cutters'), ('pattern_fabrics'),
+ ('az_customers'), ('az_warehouses'), ('sewing_rates'),
+ ('az_product_variants'), ('az_stock_balances'), ('az_stock_movements')
+),
+cols AS (
+ SELECT 'COLUMN' AS kind, t.table_name AS object_name,
+   c.column_name AS member,
+   concat_ws(' | ', c.data_type,
+      CASE WHEN c.is_nullable='NO' THEN 'NOT NULL' ELSE 'NULL' END,
+      'default='||coalesce(c.column_default,'<none>'),
+      'identity='||coalesce(c.is_identity,'NO')) AS details
+ FROM tables t JOIN information_schema.columns c
+   ON c.table_schema='public' AND c.table_name=t.table_name
+),
+constr AS (
+ SELECT 'CONSTRAINT' AS kind, c.conrelid::regclass::text AS object_name,
+   c.conname AS member,
+   pg_get_constraintdef(c.oid) AS details
+ FROM pg_constraint c
+ WHERE c.conrelid IN (SELECT to_regclass('public.'||table_name) FROM tables)
+),
+triggers AS (
+ SELECT 'TRIGGER' AS kind, t.tgrelid::regclass::text AS object_name,
+   t.tgname AS member, pg_get_triggerdef(t.oid) AS details
+ FROM pg_trigger t
+ WHERE NOT t.tgisinternal
+   AND t.tgrelid IN (SELECT to_regclass('public.'||table_name) FROM tables)
+),
+enums AS (
+ SELECT 'ENUM' AS kind, e.enumtypid::regtype::text AS object_name,
+   e.enumsortorder::text AS member, e.enumlabel AS details
+ FROM pg_enum e
+ WHERE e.enumtypid IN (
+   SELECT a.atttypid FROM pg_attribute a
+   WHERE a.attrelid IN (SELECT to_regclass('public.'||table_name) FROM tables)
+     AND a.attnum > 0 AND NOT a.attisdropped
+ )
+)
+SELECT kind, object_name, member, details
+FROM cols
+UNION ALL SELECT kind, object_name, member, details FROM constr
+UNION ALL SELECT kind, object_name, member, details FROM triggers
+UNION ALL SELECT kind, object_name, member, details FROM enums
+ORDER BY kind, object_name, member;

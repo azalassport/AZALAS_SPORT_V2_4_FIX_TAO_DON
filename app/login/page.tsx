@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -59,7 +59,7 @@ function EyeIcon({ open }: { open: boolean }) {
 }
 
 export default function LoginPage() {
-  const sb = useMemo(() => createClient(), []);
+
   const router = useRouter();
 
   const [login, setLogin] = useState("");
@@ -80,6 +80,7 @@ export default function LoginPage() {
     setBusy(true);
 
     try {
+      const sb = createClient();
       const email = resolveEmail(login);
 
       const { data, error: authError } = await sb.auth.signInWithPassword({

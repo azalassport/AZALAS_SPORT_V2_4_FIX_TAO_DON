@@ -1,0 +1,161 @@
+-- AZALAS SPORT — R2 SAFE RPC RESTORE: STOCK IMAGE + PERSONAL PROFILE
+-- PREVIEW branch; additive migration for LIVE Supabase schema audited 13/10/2026.
+-- KHONG RESET / KHONG CAP NHAT BANG / KHONG SUA DON, HOA DON, CONG NO.
+-- IMPORTANT: This creates missing RPCs but DOES NOT enable frontend R2 rollout gates.
+-- R2 image existence is NOT validated by PostgreSQL; file checks still happen in
+-- the authenticated Cloudflare upload API. Do NOT bypass API with direct RPC calls.
+
+BEGIN;
+
+-- Make sure we are NOT overwriting any live function deployed since the audit.
+DO $preflight$
+BEGIN
+  IF to_regprocedure('public.az_stock_set_image(bigint,text)') IS NOT NULL OR
+     to_regprocedure('public.az_update_my_profile(text,text,text,text)') IS NOT NULL
+  THEN
+    RAISE EXCEPTION 'STOP: mot trong hai ham da ton tai. Khong ghi de ham dang dung.';
+  END IF;
+
+  IF to_regclass('public.az_product_variants') IS NULL OR
+     to_regclass('public.az_profiles') IS NULL OR
+     to_regprocedure('public.az_is_manager()') IS NULL OR
+     to_regprocedure('public.az_is_staff()') IS NULL
+  THEN
+    RAISE EXCEPTION 'STOP: thieu bang/ham quyen CORE. Khong cai dat.';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='az_product_variants' AND column_name='image_path'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='az_profiles' AND column_name='avatar_path'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='az_profiles' AND column_name='address'
+  ) THEN
+    RAISE EXCEPTION 'STOP: thieu cot phuc vu luu anh. Khong cai dat.';
+  END IF;
+END;
+$preflight$;
+
+-- Kho: chi OWNER/ADMIN lien ket anh cua san pham.
+-- Old paths = private Supabase Storage, new paths = r2: UUID/product/UUID.ext.
+CREATE FUNCTION public.az_stock_set_image(
+  p_variant_id bigint,
+  p_path text
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+BEGIN
+  IF NOT public.az_is_manager() THEN
+    RAISE EXCEPTION 'Chi OWNER/ADMIN duoc them anh san pham';
+  END IF;
+
+  IF nullif(btrim(coalesce(p_path,'')),'') IS NULL THEN
+    RAISE EXCEPTION 'Chua co duong dan anh';
+  END IF;
+
+  IF left(p_path,3)='r2:' THEN
+    IF p_path !~ (
+      '^r2:' || auth.uid()::text || '/product/[0-9a-f-]{36}[.](png|jpg|webp)$'
+    ) THEN
+      RAISE EXCEPTION 'Duong dan R2 san pham khong hop le';
+    END IF;
+  ELSE
+    IF split_part(p_path,'/',1) <> auth.uid()::text OR
+       NOT EXISTS (
+         SELECT 1 FROM storage.objects o
+         WHERE o.bucket_id='az-product-images' AND o.name=p_path
+       )
+    THEN
+      RAISE EXCEPTION 'Anh san pham chua duoc luu tren Supabase Storage';
+    END IF;
+  END IF;
+
+  UPDATE public.az_product_variants
+  SET image_path=p_path
+  WHERE id=p_variant_id;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Khong tim thay bien the san pham';
+  END IF;
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.az_stock_set_image(bigint,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.az_stock_set_image(bigint,text) TO authenticated;
+
+-- Tai khoan ca nhan: khong cho phep sua role, is_active hay login_name.
+-- Empty avatar path means KEEP the existing image (the existing UI sends "").
+CREATE FUNCTION public.az_update_my_profile(
+  p_display_name text,
+  p_phone text DEFAULT NULL,
+  p_address text DEFAULT NULL,
+  p_avatar_path text DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql SECURITY DEFINER SET search_path=''
+AS $fn$
+DECLARE
+  v_path text := nullif(btrim(coalesce(p_avatar_path,'')), '');
+  v_old_path text;
+  v_uid uuid := auth.uid();
+BEGIN
+  IF v_uid IS NULL OR NOT public.az_is_staff() THEN
+    RAISE EXCEPTION 'Tai khoan chua dang nhap hoac khong hoat dong';
+  END IF;
+
+  IF nullif(btrim(coalesce(p_display_name,'')),'') IS NULL THEN
+    RAISE EXCEPTION 'Ten hien thi khong duoc trong';
+  END IF;
+
+  SELECT avatar_path INTO v_old_path
+  FROM public.az_profiles
+  WHERE id=v_uid
+  FOR UPDATE;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Khong tim thay ho so';
+  END IF;
+
+  IF v_path IS NOT NULL AND v_path IS DISTINCT FROM v_old_path THEN
+    IF left(v_path,3)='r2:' THEN
+      IF v_path !~ (
+        '^r2:' || v_uid::text || '/avatar/[0-9a-f-]{36}[.](png|jpg|webp)$'
+      ) THEN
+        RAISE EXCEPTION 'Duong dan R2 avatar khong hop le';
+      END IF;
+    ELSE
+      IF split_part(v_path,'/',1) <> v_uid::text OR
+         NOT EXISTS (
+           SELECT 1 FROM storage.objects o
+           WHERE o.bucket_id='az-avatars' AND o.name=v_path
+         )
+      THEN
+        RAISE EXCEPTION 'Avatar chua duoc luu tren Supabase Storage';
+      END IF;
+    END IF;
+  END IF;
+
+  UPDATE public.az_profiles
+  SET
+    display_name=btrim(p_display_name),
+    phone=nullif(btrim(coalesce(p_phone,'')),''),
+    address=nullif(btrim(coalesce(p_address,'')),''),
+    avatar_path=coalesce(v_path,avatar_path)
+  WHERE id=v_uid;
+END
+$fn$;
+
+REVOKE ALL ON FUNCTION public.az_update_my_profile(text,text,text,text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.az_update_my_profile(text,text,text,text) TO authenticated;
+
+NOTIFY pgrst, 'reload schema';
+COMMIT;
+
+-- CHI DOC — xac nhan da tao ham. KHONG TAO HO SO / SP THU.
+SELECT
+  to_regprocedure('public.az_stock_set_image(bigint,text)') IS NOT NULL
+    AS stock_image_rpc_ok,
+  to_regprocedure('public.az_update_my_profile(text,text,text,text)') IS NOT NULL
+    AS profile_rpc_ok;

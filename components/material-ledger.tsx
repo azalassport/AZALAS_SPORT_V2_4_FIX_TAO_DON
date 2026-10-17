@@ -3,6 +3,7 @@
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
 import {Boxes,HandCoins,Layers3,Link2,Palette,Printer,ReceiptText,Tag,WalletCards} from "lucide-react";
 import {createClient} from "@/lib/supabase/client";
+import {uploadR2File} from "@/lib/azalas/media-client";
 import {money,norm,vnToday} from "@/lib/azalas/format";
 import {Loading,Msg} from "@/components/ui";
 
@@ -197,10 +198,7 @@ export default function MaterialLedger({category,title,book}:{category:Category;
   }
 
   async function uploadClosePdf(file:File){
-    const {data:{user}}=await sb.auth.getUser();if(!user)throw new Error("Chưa đăng nhập");
-    const path=`${user.id}/${book||"IN"}/${closeForm.month}/${Date.now()}-${safeFile(file.name)}`;
-    const {error}=await sb.storage.from("az-supply-documents").upload(path,file,{upsert:false,contentType:file.type||"application/pdf"});
-    if(error)throw error;return path;
+    return uploadR2File(file,"supply");
   }
 
   async function saveMonthlyClose(){
@@ -215,7 +213,10 @@ export default function MaterialLedger({category,title,book}:{category:Category;
       const {error}=await sb.from("supply_entries").insert({partner_id:fixedPartner.id,category,entry_date:`${closeForm.month}-01`,item_name:"Chốt tháng",quantity:1,unit:"tháng",unit_price:amount,note:category==="IN"?(closeForm.note.trim()||null):null,entry_kind:"MONTHLY_CLOSE",document_path:documentPath,created_by:user?.id});
       if(error)throw error;
       setCloseForm({month:vnToday().slice(0,7),amount:"",note:"",file:null});setOk(`Đã chốt ${title}.`);await load();
-    }catch(e){if(documentPath)await sb.storage.from("az-supply-documents").remove([documentPath]);setErr(e instanceof Error?e.message:String(e));}
+    }catch(e){
+      // Never delete a potentially linked R2 document during a failed save.
+      setErr(e instanceof Error?e.message:String(e));
+    }
     finally{setBusy(false)}
   }
 
@@ -234,7 +235,23 @@ export default function MaterialLedger({category,title,book}:{category:Category;
   }
 
   async function openPdf(path:string|null){
-    if(!path)return;const {data,error}=await sb.storage.from("az-supply-documents").createSignedUrl(path,3600);if(error)return setErr(error.message);window.open(data.signedUrl,"_blank","noopener,noreferrer");
+    if(!path)return;
+    if(path.startsWith("r2:")){
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)return setErr("Hết phiên đăng nhập");
+      const endpoint=path.includes("/vai/")?"/api/azalas/fabric-files":"/api/azalas/media";
+      const response=await fetch(endpoint+"?path="+encodeURIComponent(path),{
+        headers:{Authorization:`Bearer ${session.access_token}`}
+      });
+      if(!response.ok){const result=await response.json().catch(()=>({error:"Không đọc được ảnh R2"}));return setErr(result.error||"Không đọc được ảnh R2")}
+      const blob=await response.blob(),url=URL.createObjectURL(blob);
+      window.open(url,"_blank","noopener,noreferrer");
+      setTimeout(()=>URL.revokeObjectURL(url),60000);
+      return;
+    }
+    const {data,error}=await sb.storage.from("az-supply-documents").createSignedUrl(path,3600);
+    if(error)return setErr(error.message);
+    window.open(data.signedUrl,"_blank","noopener,noreferrer");
   }
 
   function fabricCalc(r:FabricRow){
@@ -274,12 +291,32 @@ export default function MaterialLedger({category,title,book}:{category:Category;
     if(!user)return setErr("Không xác định được tài khoản đăng nhập");
     const documentPath=`${user.id}/vai/${Date.now()}-${crypto.randomUUID()}.png`;
     setBusy(true);
-    const {error:uploadError}=await sb.storage.from("az-supply-documents").upload(documentPath,fabricInvoiceBlob,{contentType:"image/png",upsert:false});
-    if(uploadError){setBusy(false);return setErr(`Không lưu được ảnh phiếu: ${uploadError.message}`)}
-    const payloadWithImage=entryPayload.map(x=>({...x,document_path:documentPath}));
+    let uploadedPath="";
+    try{
+      const form=new FormData();
+      form.append("file",new File([fabricInvoiceBlob],"fabric-invoice.png",{type:"image/png"}));
+      const {data:{session}}=await sb.auth.getSession();
+      if(!session)throw new Error("Hết phiên đăng nhập");
+      const response=await fetch("/api/azalas/fabric-files",{
+        method:"POST",headers:{Authorization:`Bearer ${session.access_token}`},body:form
+      });
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error||"Không lưu được ảnh lên R2");
+      uploadedPath=String(result.path||"");
+      if(!uploadedPath.startsWith("r2:"))throw new Error("R2 không trả về mã ảnh hợp lệ");
+    }catch(e){
+      setBusy(false);
+      return setErr(`Không lưu được ảnh phiếu lên R2: ${e instanceof Error?e.message:String(e)}`);
+    }
+    const payloadWithImage=entryPayload.map(x=>({...x,document_path:uploadedPath}));
     const {error}=await sb.rpc("az_supply_save_fabric_batch",{p_partner_id:partner,p_entries:payloadWithImage,p_payments:payPayload});
     if(error){
-      await sb.storage.from("az-supply-documents").remove([documentPath]);
+      const {data:{session}}=await sb.auth.getSession();
+      if(session)await fetch("/api/azalas/fabric-files",{
+        method:"DELETE",headers:{"Content-Type":"application/json",Authorization:`Bearer ${session.access_token}`},
+        body:JSON.stringify({path:uploadedPath})
+      }).catch(()=>{});
+
       setBusy(false);return setErr(error.message);
     }
     setBusy(false);setFabricRows([newFabricRow()]);setFabricCopiedSignature("");setFabricInvoiceBlob(null);setFabricPreview(false);setOk("Đã lưu phiếu Vải và ảnh hóa đơn.");await load();

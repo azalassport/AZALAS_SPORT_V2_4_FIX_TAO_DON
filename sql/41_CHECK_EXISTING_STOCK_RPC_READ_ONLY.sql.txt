@@ -1,0 +1,31 @@
+-- AZALAS SPORT | SQL 41 | KIEM TRA CAC HAM KHO DANG CO
+-- CHI SELECT, KHONG THAY DOI DU LIEU / KHONG TAO HOAC SUA RPC.
+-- Duoc su dung sau khi SQL 40 dung voi thong bao "RPC kho da ton tai".
+-- Export CSV va gui lai de xac dinh ham nao nen GIU NGUYEN, ham nao con thieu.
+
+WITH required(name, expected_signature) AS (
+  VALUES
+    ('az_stock_upsert_product',
+     'public.az_stock_upsert_product(text,text,text,text,text,text,text)'),
+    ('az_stock_set_quantity',
+     'public.az_stock_set_quantity(bigint,bigint,bigint,text)')
+),
+found AS (
+  SELECT
+    r.name,
+    r.expected_signature,
+    p.oid,
+    p.oid::regprocedure::text AS actual_signature,
+    pg_get_functiondef(p.oid) AS existing_sql
+  FROM required r
+  LEFT JOIN pg_proc p
+    ON p.oid = to_regprocedure(r.expected_signature)
+)
+SELECT
+  name AS function_name,
+  expected_signature,
+  CASE WHEN oid IS NULL THEN 'MISSING' ELSE 'EXISTS' END AS status,
+  actual_signature,
+  existing_sql
+FROM found
+ORDER BY function_name;

@@ -24,7 +24,17 @@ export default function PatternCustomer() {
     void (async () => {
       const { data, error } = await sb.rpc("az_pattern_progress");
       if (error) setErr(error.message);
-      else setJobs(((data || []) as Job[]).filter(j => j.order_type === "KHACH_DAT"));
+      else {
+        const customerJobs = ((data || []) as Job[]).filter(j => j.order_type === "KHACH_DAT");
+        // Standalone customer patterns have no order_group; due date is on pattern_jobs.
+        // The legacy progress RPC may therefore return null. Read only fields allowed by RLS.
+        const missingIds = customerJobs.filter(j => !j.delivery_date).map(j => j.id);
+        if (missingIds.length) {
+          const {data: extra} = await sb.from("pattern_jobs").select("id,delivery_date").in("id", missingIds);
+          const dates = new Map((extra || []).map(x => [x.id, x.delivery_date as string | null]));
+          setJobs(customerJobs.map(j => ({...j, delivery_date: j.delivery_date || dates.get(j.id) || null})));
+        } else setJobs(customerJobs);
+      }
       setLoading(false);
     })();
   }, [sb]);

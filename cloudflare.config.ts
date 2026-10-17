@@ -1,6 +1,7 @@
 import { bindings, defineConfig, defineWorker } from "cf/config";
 
 export default defineConfig({
+  accountId: "d3b0ff95493c448c5f94b9be4da14469",
   worker: defineWorker({
     name: "azalas-sport-full",
     entrypoint: "vinext/server/fetch-handler",

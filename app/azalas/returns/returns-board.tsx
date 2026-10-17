@@ -20,6 +20,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { mediaUrl } from "@/lib/azalas/media-client";
 import { dt, money, norm } from "@/lib/azalas/format";
 import { ImageViewer, Loading, Msg } from "@/components/ui";
 
@@ -184,9 +185,8 @@ export default function ReturnsBoard() {
       if (error) { setErr(error.message); setPhotoLoading(false); return; }
       const imageList = await Promise.all(((data || []) as Omit<ReturnPhoto, "url">[])
         .map(async photo => {
-          const { data: signed } = await sb.storage.from("az-invoice-images")
-            .createSignedUrl(photo.photo_path, 3600);
-          return { ...photo, url: signed?.signedUrl || "" };
+          const url=await mediaUrl(sb,"az-invoice-images",photo.photo_path,3600).catch(()=>"");
+          return { ...photo, url };
         }));
       if (active) { setPhotos(imageList); setPhotoLoading(false); }
     })();
